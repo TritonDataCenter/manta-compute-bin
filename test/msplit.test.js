@@ -2,7 +2,6 @@
  * tst.msplit.js: msplit tests
  */
 
-var mod_assert = require('assert');
 var mod_fs = require('fs');
 var mod_child_process = require('child_process');
 

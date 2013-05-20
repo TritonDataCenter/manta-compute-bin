@@ -1,5 +1,5 @@
 {
-    "name": "manta-comput-bin",
+    "name": "manta-compute-bin",
     "description": "Utilities included in Manta compute.",
     "version": "1.0.0",
     "author": "Joyent (joyent.com)",
