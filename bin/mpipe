@@ -1,0 +1,157 @@
+#!/usr/node/bin/node
+// -*- mode: js -*-
+// Copyright (c) 2013, Joyent, Inc. All rights reserved.
+
+var mod_assert = require('assert');
+var mod_fs = require('fs');
+var mod_path = require('path');
+
+var mod_bunyan = require('bunyan');
+var mod_getopt = require('posix-getopt');
+var mod_manta = require('manta');
+var mod_uuid = require('node-uuid');
+
+var mod_mautil = require('../lib/util');
+
+/*
+ * mpipe: distributed pipe
+ */
+var dpUsageMessage = [
+    'usage: mpipe [-p] [-r reducer] [-H header:value ... ] [objectkey]',
+    '',
+    'mpipe is a distributed pipe for compute jobs.  This command reads data',
+    'from stdin and saves it as a new object called "objectkey".  The new ',
+    'object is recorded as an output object for the current task.  If ',
+    '"objectkey" is unspecified, a unique key will be created.  Otherwise, ',
+    'the object\'s parent directory must already exist, unless -p is also ',
+    'specified.',
+    '',
+    'Because the object store requires knowing content-length ahead of time, ',
+    'this command buffers input to the local filesystem before uploading any ',
+    'of it.',
+    '',
+    'If -r is specified, then "reducer" must be an integer between 0 and the ',
+    'number of concurrent reducers in the next phase of the job.  The object ',
+    'will be marked for processing by that reducer.  If -r is not specified ',
+    'and multiple reducers are in use, the object will be routed to one at ',
+    'random.',
+    '',
+    'The optional -H option is used to add headers to the object.  It can be',
+    'specified multiple times.'
+].join('\n');
+
+var dpTmpfile = '/var/tmp/mpipe.' + process.pid;
+var dpObjkey, dpReducer;
+var dpOutstream, dpInstream;
+var dpNoretry = false;
+var dpHeaders = {};
+var dpOptP = false;
+
+function main()
+{
+	var parser, option;
+
+	parser = new mod_getopt.BasicParser('H:pr:', process.argv);
+
+	while ((option = parser.getopt()) !== undefined) {
+		switch (option.option) {
+		case 'H':
+			if (option.optarg.indexOf(': ') === -1) {
+				var m = 'mpipe: headers must be in the ' +
+					'format [header]: [value].';
+				console.error(m);
+				usage();
+			}
+			var p = option.optarg.split(': ');
+			dpHeaders[p[0]] = p.slice(1).join(': ');
+			break;
+
+		case 'p':
+			dpOptP = true;
+			break;
+
+		case 'r':
+			dpReducer = parseInt(option.optarg, 10);
+			if (isNaN(dpReducer)) {
+				console.error('mpipe: invalid reducer');
+				usage();
+			}
+			break;
+
+		default:
+			/* error message already emitted by getopt */
+			mod_assert.equal('?', option.option);
+			usage();
+			break;
+		}
+	}
+
+	if (parser.optind() < process.argv.length) {
+		dpObjkey = process.argv[parser.optind()];
+		dpNoretry = !dpOptP;
+	} else if (process.env['MANTA_OUTPUT_BASE']) {
+		dpObjkey = process.env['MANTA_OUTPUT_BASE'] + mod_uuid.v4();
+	} else {
+		/*
+		 * User programs invoking "mpipe" are expected to pass through
+		 * the environment they were created with, which will contain
+		 * variables we need to name the output key appropriately.  If
+		 * this becomes problematic for some use cases, we could fetch
+		 * this information from the HTTP server inside the zone,
+		 * obviously with some additional latency.
+		 */
+		console.error(
+		    'mpipe: manta configuration not found in environment');
+		process.exit(2);
+	}
+
+	console.error('saving stdin to %s', dpTmpfile);
+	dpOutstream = mod_fs.createWriteStream(dpTmpfile);
+	dpOutstream.on('close', dpUploadFile);
+	process.stdin.pipe(dpOutstream);
+	process.stdin.resume();
+	process.stdin.on('end', function () {
+		dpOutstream.end();
+	});
+}
+
+function usage()
+{
+	console.error(dpUsageMessage);
+	process.exit(2);
+}
+
+function dpFatal(message)
+{
+	console.error('mpipe: %s', message);
+	process.exit(1);
+}
+
+function dpUploadFile()
+{
+	var log = new mod_bunyan({ 'name': 'mpipe', 'level': 'fatal' });
+
+	var client = mod_manta.createClient({
+	    'agent': false,
+	    'url': process.env['MANTA_URL'],
+	    'log': log,
+	    'retry': false,
+	    'sign': mod_mautil.mantaSignNull
+	});
+
+	mod_mautil.mantaFileSave({
+	    'client': client,
+	    'filename': dpTmpfile,
+	    'headers': dpHeaders,
+	    'key': dpObjkey,
+	    'log': log,
+	    'iostream': 'stdout',
+	    'rIdx': dpReducer
+	}, function (err) {
+		if (err)
+			dpFatal(err.message);
+		console.log(dpObjkey);
+	}, dpNoretry);
+}
+
+main();

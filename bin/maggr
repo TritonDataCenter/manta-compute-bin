@@ -1,0 +1,451 @@
+#!/usr/node/bin/node
+// -*- mode: js -*-
+// Copyright (c) 2013, Joyent, Inc. All rights reserved.
+
+/*
+ * maggr
+ * a command-line aggregation tool
+ */
+
+var carrier = require('carrier');
+var events = require('events');
+var EventEmitter = events.EventEmitter;
+var getopt = require('posix-getopt');
+var util = require('util');
+var fs = require('fs');
+
+var OPS = {
+	key:    { deps: [] },
+	nop:    { deps: [] },
+
+	count:  { deps: [] },
+	max:    { deps: [] },
+	mean:   { deps: ['sum', 'count'] },
+	min:    { deps: [] },
+	range:  { deps: ['min', 'max'] },
+	sum:    { deps: [] }
+};
+
+var msUsage = [
+	'USAGE:	maggr	[-c#=<op list> -c#=<op list> ...]',
+	'		[-f file] [-d input delimiter] [-o output delimiter]',
+	'		[-i inner output delimiter] [op list]',
+	'	maggr	-l',
+	'Example: maggr -d ":" -o "-" -c1=key -c3=nop sum,mean',
+	'',
+	'-f	read from file instead of reading from stdin',
+	'',
+	'-c#<op list>	specify a list of operations to perform on column #',
+	'		columns start at 1',
+	'		multiple operations are separated by commas (,)',
+	'',
+	'-d	string that separates columns in the input',
+	'',
+	'-o	string that separates columns in the output',
+	'',
+	'-i	string that separates results for a single column when',
+	'	multiple operations are specified',
+	'',
+	'-l	lists supported operations',
+	'',
+	'Performs key-wise aggregation on plain text files.',
+	'',
+	'Specify aggregation operations on columns. Specify operations for',
+	'each column using -c#=<op list>, replacing # with the column number.',
+	'The first column is column 1, awk style. Multiple operations can be',
+	'specified by separating them with commas. e.g. -c2=sum,mean.',
+	'Specify operations to be performed on all other columns after all',
+	'arguments.',
+	'',
+	'Specify key columns using the "key" operation. Columns can be ignored',
+	'with the "nop" operation.',
+	'',
+	'Columns from input are parsed using the string specified with the',
+	'-d option or by spaces.',
+	'',
+	'Results are printed by key. Each aggregated result is printed in the',
+	'same order as the input, including the keys. Columns are separated by',
+	'the delimiter specified by the -o option, otherwise by the input',
+	'delimiter. If multiple operations were specified for a single column,',
+	'results will be printed in the same order they were specified and',
+	'separated by the delimiter specified by the -i option, otherwise by',
+	'commas.'
+].join('\n');
+
+function usage(errstring) {
+	console.warn('Error: ' + errstring);
+	console.warn(msUsage);
+}
+
+
+function sum(value, aggr) {
+	aggr.sum = aggr.sum || {};
+	aggr.sum.result = aggr.sum.result + value || value;
+}
+
+function mean(aggr) {
+	aggr.mean = {
+		result: aggr.sum.result / aggr.count.result
+	};
+}
+
+function count(aggr) {
+	aggr.count = aggr.count || {};
+	aggr.count.result = aggr.count.result + 1 || 1;
+}
+
+function range(aggr) {
+	aggr.range = aggr.range || {};
+	aggr.range.result = Math.abs(aggr.max.result - aggr.min.result);
+}
+
+function min(value, aggr) {
+	aggr.min = aggr.min || {};
+	aggr.min.result = aggr.min.result === undefined ?
+		value :
+		Math.min(aggr.min.result, value);
+}
+
+function max(value, aggr) {
+	aggr.max = aggr.max || {};
+	aggr.max.result = aggr.max.result === undefined ?
+		value :
+		Math.max(aggr.max.result, value);
+}
+
+function buffer(value, aggr) {
+	aggr.buffer = aggr.buffer || {};
+	aggr.buffer.values = aggr.buffer.values || [];
+	aggr.buffer.values.push(value);
+}
+
+function isNumber(n) {
+	return (!isNaN(parseFloat(n)));
+}
+
+function listOps() {
+	var s = '';
+	Object.keys(OPS).forEach(function (op) {
+		s += op + ' ';
+	});
+	return (s);
+}
+
+
+/*
+ * Checks if the ops specified make sense and adds any dependencies.
+ */
+function processOps(ops) {
+	var processedOps = {};
+
+	processedOps.singleOps = {}; // operations that have no dependencies
+
+	processedOps.postOps = {};  // operations that must be performed after
+				    // other ones, i.e. they have dependencies
+
+	processedOps.outputOps = {}; // operations that the user explicitly
+				     // requested to be performed
+
+	ops.forEach(function (op) {
+		if (op === 'key' && ops.length > 1) {
+			usage('no other operations can be specified ' +
+				'for a column marked as a key');
+			process.exit(1);
+		}
+
+		if (op === 'nop' && ops.length > 1) {
+			usage('no other operations can be specified ' +
+				'for a column marked nop');
+			process.exit(1);
+		}
+
+		if (!OPS[op])  {
+			usage('unsupported operation: ' + op);
+			process.exit(1);
+		}
+
+		if (OPS[op].deps.length === 0) {
+			processedOps.singleOps[op] = true;
+		} else {
+			OPS[op].deps.forEach(function (dependency) {
+				processedOps.singleOps[dependency] = true;
+			});
+			processedOps.postOps[op] = true;
+		}
+
+		processedOps.outputOps[op] = true;
+	});
+	return (processedOps);
+}
+
+
+function getOpts(argv) {
+	var opts = {};
+	opts.ops = [];
+	var option;
+
+	var parser = new getopt.BasicParser(':d:o:i:c:f:l', argv);
+	while ((option = parser.getopt()) !== undefined) {
+		switch (option.option) {
+		case 'd':
+			opts.inputDelimiter = option.optarg;
+			break;
+		case 'o':
+			opts.outputDelimiter = option.optarg;
+			break;
+		case 'i':
+			opts.innerDelimiter = option.optarg;
+			break;
+		case 'c':
+			var split = option.optarg.split('=');
+			if (!isNumber(split[0])) {
+				usage('invalid column number');
+				process.exit(1);
+			}
+
+			// columns are numbered from 1, awk style
+			var column = parseFloat(split[0]) - 1;
+			if (column < 0) {
+				usage('invalid column number');
+				process.exit(1);
+			}
+			var ops = split[1].split(',');
+			opts.ops[column] = processOps(ops);
+			if ('key' in opts.ops[column]) {
+				opts.ops.explicitKey = true;
+			}
+			break;
+		case 'f':
+			opts.inputFile = option.optarg;
+			break;
+		case 'l':
+			console.warn(listOps());
+			process.exit(0);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (parser.optind() >= process.argv.length && opts.ops.length <= 0) {
+		if (opts.ops.length <= 0) {
+			usage('no operations specified');
+			process.exit(1);
+		}
+	}
+
+	if (parser.optind() < process.argv.length) {
+		var globalOps = process.argv[parser.optind()].split(',');
+		opts.ops.global = processOps(globalOps);
+		if ('key' in opts.ops.global) {
+			opts.ops.explicitKey = true;
+		}
+	}
+
+	opts.inputDelimiter = opts.inputDelimiter || ' ';
+	opts.outputDelimiter = opts.outputDelimiter ||
+		opts.inputDelimiter || ' ';
+	opts.innerDelimiter = opts.innerDelimiter || ',';
+	return (opts);
+}
+
+
+/*
+ * Parses a single line of input into a key and values.
+ * Each line is split into columns. Each column is added to the key or the
+ * values array depending on the operation specified for that column.
+ */
+function lineParse(delim, ops, input) {
+	var e = new EventEmitter();
+	var carry;
+	if (input) {
+		carry = carrier.carry(fs.createReadStream(input,
+			{ encoding: 'utf8' }));
+	} else {
+		carry = carrier.carry(process.openStdin());
+	}
+
+	/*
+	 * If no key was specified, either by column or globally, then we will
+	 * implicitly infer which columns should be keys based on the first
+	 * line of input. Any non-number fields in the line will determine
+	 * whether the column is used as a key or value.
+	 */
+	function firstLine(line) {
+		var columns = line.split(delim);
+		if (!ops.explicitKey) {
+			for (var col = 0; col < columns.length; col++) {
+				var colOps = ops[col] || ops.global;
+				var nopCol = 'nop' in colOps.singleOps;
+				var isNum = isNumber(columns[col]);
+
+				if (!nopCol && !isNum) {
+					ops[col] = {};
+					ops[col].singleOps = {
+						key: true
+					};
+					ops[col].outputOps = {
+						key: true
+					};
+					ops[col].postOps = {};
+				}
+
+			}
+		}
+		carry.removeListener('line', firstLine);
+		carry.on('line', onLine);
+		onLine(line);
+	}
+
+	function onLine(line) {
+		var columns = line.split(delim);
+		var key = '';
+		var values = [];
+		var ignore = false;
+		for (var col = 0; col < columns.length; col++) {
+			var colOps = ops[col] || ops.global;
+
+			// use this column as part of the aggregation key
+			if ('key' in colOps.singleOps) {
+				key += columns[col];
+				values[col] = columns[col];
+			} else if ('nop' in colOps.singleOps) {
+				values[col] = columns[col];
+			} else {
+				var num = parseFloat(columns[col]);
+				if (isNaN(num)) {
+					ignore = true;
+					console.warn('Non-number in non-key ' +
+						'column ' + col + '. ' +
+						'line: ' + line);
+					break;
+				}
+				values[col] = num;
+			}
+		}
+		if (!ignore) {
+			e.emit('line', key, values);
+		}
+	}
+
+	carry.on('line', firstLine);
+	carry.on('error', e.emit.bind(e, 'error'));
+	carry.once('end', e.emit.bind(e, 'end'));
+	return (e);
+}
+
+
+/*
+ * Prints the result object.
+ * Each key and it's aggregated columns are printed on a line.
+ * Columns are separated by opts.outputDelimiter
+ * If multiple operations were specfied for a column, the results are separated
+ * by opts.innerDelimiter.
+ */
+function printResults(results, ops, delim, ifs) {
+	Object.keys(results).forEach(function (key) {
+		var line = '';
+		for (var val = 0; val < results[key].length; val++) {
+			var colOps = ops[val] || ops.global;
+
+			if ('nop' in colOps.outputOps) {
+				continue;
+			}
+
+			Object.keys(colOps.outputOps).forEach(function (op) {
+				line += results[key][val][op].result + ifs;
+			});
+
+			line = line.substring(0, line.lastIndexOf(ifs));
+			line += delim;
+		}
+		line = line.substring(0, line.lastIndexOf(delim));
+		console.log(line);
+	});
+}
+
+
+function main() {
+	var opts = getOpts(process.argv);
+	var lineParser = lineParse(opts.inputDelimiter, opts.ops,
+		opts.inputFile);
+	var results = {};
+
+	lineParser.on('line', function (key, values) {
+		results[key] = results[key] || [];
+		for (var val = 0; val < values.length; val++) {
+			if (val >= results[key].length) {
+				results[key].push({});
+			}
+			var ops = opts.ops[val] || opts.ops.global;
+			var aggr = results[key][val];
+			var value = values[val];
+
+			Object.keys(ops.singleOps).forEach(function (op) {
+				switch (op) {
+				case 'sum':
+					sum(value, aggr);
+					break;
+				case 'count':
+					count(aggr);
+					break;
+				case 'max':
+					max(value, aggr);
+					break;
+				case 'min':
+					min(value, aggr);
+					break;
+				case 'buffer':
+					buffer(value, aggr);
+					break;
+				case 'key':
+					aggr.key = {
+						result: value
+					};
+					break;
+				default:
+					break;
+				}
+			});
+
+		}
+	});
+
+	lineParser.once('end', function () {
+		Object.keys(results).forEach(function (key) {
+			for (var val = 0; val < results[key].length; val++) {
+				var ops = opts.ops[val] || opts.ops.global;
+				var aggr = results[key][val];
+
+				Object.keys(ops.postOps).forEach(function (op) {
+					switch (op) {
+					case 'mean':
+						mean(aggr);
+						break;
+					case 'range':
+						range(aggr);
+						break;
+					default:
+						break;
+					}
+				});
+
+			}
+		});
+		printResults(results, opts.ops, opts.outputDelimiter,
+			opts.innerDelimiter);
+	});
+}
+
+if (require.main === module) {
+	main();
+}
+
+module.exports = {
+	count: count,
+	max: max,
+	mean: mean,
+	min: min,
+	range: range,
+	sum: sum
+};

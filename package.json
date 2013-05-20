@@ -1,0 +1,30 @@
+{
+    "name": "manta-comput-bin",
+    "description": "Utilities included in Manta compute.",
+    "version": "1.0.0",
+    "author": "Joyent (joyent.com)",
+    "private": true,
+    "main": "lib/index.js",
+    "dependencies": {
+        "assert-plus": "0.1.2",
+        "bunyan": "0.20.0",
+        "carrier": "0.1.7",
+        "manta": "git+ssh://git@github.com:joyent/node-manta.git#master",
+        "memorystream": "0.2.0",
+        "node-uuid": "1.4.0",
+        "posix-getopt": "1.0.0",
+        "retry": "0.6.0",
+        "verror": "1.3.6"
+    },
+    "devDependencies": {
+        "nodeunit": "0.8.0"
+    },
+    "directories": {
+        "bin": "./bin",
+        "lib": "./lib",
+        "man": "./man"
+    },
+    "engines": {
+        "node": ">=0.8.14"
+    }
+}

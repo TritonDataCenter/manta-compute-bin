@@ -1,0 +1,105 @@
+#!/usr/node/bin/node
+// -*- mode: js -*-
+// Copyright (c) 2013, Joyent, Inc. All rights reserved.
+
+var mod_http = require('http');
+var mod_path = require('path');
+
+var mod_assert = require('assert');
+var mod_getopt = require('posix-getopt');
+
+/*
+ * mcat: emit a file by reference
+ */
+var mcUsageMessage = [
+    'usage: mcat objectkey',
+    '',
+    'mcat emits the named Manta object as an output for the current task.  ',
+    'This is analagous to cat(1), except that the inputs are Manta objects ',
+    'instead of local files, and they\'re emitted as output of the task ',
+    'instead of directly to stdout.',
+    '',
+    'This is useful for cases where the input to a task is an object which ',
+    'itself contains a list of objects to be processed in the next phase,',
+    'such as:',
+    '',
+    '    /dap/stor/data1.txt',
+    '    /dap/stor/data2.txt',
+    '    ...',
+    '',
+    'Using mcat, a task in phase N can emit these objects to phase N+1 ',
+    'without actually having to download them first, by just invoking:',
+    '',
+    '    mcat /dap/stor/data1.txt',
+    '    mcat /dap/stor/data2.txt',
+    '    mcat ...',
+    ''
+].join('\n');
+
+var mcReducer;
+
+function main()
+{
+	var parser, option;
+
+	parser = new mod_getopt.BasicParser('r:', process.argv);
+
+	while ((option = parser.getopt()) !== undefined) {
+		switch (option.option) {
+		case 'r':
+			mcReducer = parseInt(option.optarg, 10);
+			if (isNaN(mcReducer)) {
+				console.error('mcat: invalid reducer');
+				usage();
+			}
+			break;
+
+		default:
+			/* error message already emitted by getopt */
+			mod_assert.equal('?', option.option);
+			usage();
+			break;
+		}
+	}
+
+	if (parser.optind() >= process.argv.length) {
+		console.error(mcUsageMessage);
+		process.exit(2);
+	}
+
+	process.argv.slice(parser.optind()).forEach(function (uri) {
+		var headers = {
+		    'x-manta-reference': true,
+		    'x-manta-stream': 'stdout'
+		};
+
+		if (mcReducer !== undefined)
+			headers['x-manta-reducer'] = mcReducer;
+
+		var request = mod_http.request({
+		    'host': 'localhost',
+		    'port': 80,
+		    'method': 'PUT',
+		    'path': uri,
+		    'headers': headers
+		});
+
+		request.end();
+
+		request.on('response', function (response) {
+			if (response.statusCode != 204) {
+				console.error('server returned ' +
+				    response.statusCode);
+				process.exit(1);
+			}
+		});
+	});
+}
+
+function usage()
+{
+	console.error(mcUsageMessage);
+	process.exit(2);
+}
+
+main();

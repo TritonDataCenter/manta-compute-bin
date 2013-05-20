@@ -1,0 +1,437 @@
+#!/usr/node/bin/node
+// -*- mode: js -*-
+// Copyright (c) 2013, Joyent, Inc. All rights reserved.
+
+var mod_assert = require('assert');
+var mod_bunyan = require('bunyan');
+var mod_carrier = require('carrier');
+var mod_crypto = require('crypto');
+var mod_fs = require('fs');
+var mod_getopt = require('posix-getopt');
+var mod_manta = require('manta');
+var mod_macommon = require('../lib/common');
+var mod_uuid = require('node-uuid');
+
+/*
+ * msplit: demux streams to send to multiple reducers
+ */
+var msUsageMessage = [
+	'usage: msplit [-n number_of_reducers] [-d delimiter] [-f field_list]',
+	'              [-j] [-e javascript]',
+	'',
+	'msplit is used to split a stream into many mpipes, one per the number',
+	'of reducers for your job.  The -n option specifies the number of',
+	'reducers your job has and must match the number of reducers for the',
+	'next phase of your job.',
+	'',
+	'msplit can work on newline separated text or json records.  By',
+	'default msplit works on text lines, similar to the unix cut utility.',
+	'',
+	'Using to parse text:',
+	'The -d and -f fields are optional and specify the delimiter to use',
+	'when splitting fields and the field list to use to construct the key',
+	'used to map to reducers.  The delimiter defaults to (tab).  The field',
+	'defaults to 1.  If the field does not exist (if it is out of range,',
+	'for example), it will simply not be part of the partitioning key.',
+	'The implications of this is that if all fields are invalid all output',
+	'will go to the same reducer.',
+	'',
+	'For example, to split on comma and use the 5th and 3rd fields to ',
+	'demux to 4 reducers:',
+	'   ... | msplit -d \',\' -f 5,3 -n 4',
+	'',
+	'Using to parse json (using the -j option):',
+	'The -f field is required and is used to specify the fields that will',
+	'be used to map the record to a reducer.  Similar to text processing,',
+	'if the field doesn\'t exist, the field will be ignored.',
+	'',
+	'For example, to split json records on the id and type fields to ',
+	'demux to 4 reducers:',
+	'   ... | msplit -j -f id,type -n 4',
+	'',
+	'Using the exec option (-e):',
+	'You can also write arbitrary javascript to work over your records.',
+	'The exec line given will become the function body for the following',
+	'function signature:',
+	'   function (line) { ... }',
+	'',
+	'A string must be returned from the function.  To reduce the size of',
+	'one-liners, if msplit detects no \'return\', it will enclose the code',
+	'in \'return ( ... )\'.  For example, if you are parsing text and want',
+	'the partition key to be the first 16 characters, either of these',
+	'will work:',
+	'   ... | msplit -e "return line.substring(0,16)" -n 4',
+	'   ... | msplit -e "line.substring(0,16)" -n 4',
+	'',
+	'For multiple statements, you must include a \'return\'.',
+	'',
+	'If you are using the -j option, the object will be parsed as json and',
+	'bound to \'this\' when the function is invoked.  For example, given',
+	'this object:',
+	'   {"id":"1234567890-22-0987654321", "name":...}',
+	'',
+	'You can use the first 9 characters of the id field with:',
+	'   ... | msplit -e "this.id.substring(0,9)" -n 4'
+].join('\n');
+
+var msHashAlgo = 'md5';
+var msObjPrefix = null;
+var msStreams = [];
+var msTestMode = false;
+var msTmpFilePrefix = '/var/tmp/msplit.' + process.pid + '.';
+
+function main()
+{
+	var carrier;
+	var i = 0;
+	var option;
+	var parser;
+	var opts = {};
+	opts.delimiter = '\t';
+	opts.fields = [];
+	opts.nReducers = null;
+	opts.parseJson = false;
+
+	parser = new mod_getopt.BasicParser('d:f:n:e:jt', process.argv);
+
+	while ((option = parser.getopt()) !== undefined) {
+		switch (option.option) {
+		case 'd':
+			opts.delimiter = option.optarg;
+			if (opts.delimiter === '\n') {
+				usage('cannot use newline as a delimiter.');
+			}
+			break;
+
+		case 'e':
+			opts.exec = option.optarg;
+			break;
+
+		case 'f':
+			var tmpFields = option.optarg.split(',');
+			opts.fields = opts.fields.concat(tmpFields);
+			break;
+
+		case 'j':
+			opts.parseJson = true;
+			break;
+
+		case 'n':
+			opts.nReducers = parseInt(option.optarg, 10);
+			if (isNaN(opts.nReducers)) {
+				usage('invalid number of reducers');
+			}
+			break;
+
+		case 't':
+			msTestMode = true;
+			break;
+
+		default:
+			/* error message already emitted by getopt */
+			mod_assert.equal('?', option.option);
+			usage();
+			break;
+		}
+	}
+
+	if (!opts.nReducers) {
+		usage('number of reducers must be specified.');
+	}
+
+	if (!msTestMode) {
+		if (!process.env['MANTA_OUTPUT_BASE']) {
+			usage('MANTA_OUTPUT_BASE not set');
+		}
+		msObjPrefix = process.env['MANTA_OUTPUT_BASE'] +
+			mod_uuid.v4() + '.';
+	}
+
+	// Select the line splitter and verify we have everything
+	if (opts.exec !== undefined) {
+		opts.execFunc = constructExecFunc(opts);
+		opts.parseKey = parseAndExec;
+	} else if (opts.parseJson) { // Just json
+		opts.parseKey = parseLikeJson;
+		if (opts.fields.length < 1) {
+			usage('no fields specified');
+		}
+	} else { // cut
+		opts.parseKey = parseLikeCut;
+		for (i = 0; i < opts.fields.length; ++i) {
+			opts.fields[i] = parseInt(opts.fields[i], 10);
+			if (isNaN(opts.fields[i])) {
+				usage('invalid field: ' + opts.fields[i]);
+			}
+		}
+		if (opts.fields.length < 1) {
+			opts.fields.push(1);
+		}
+	}
+
+	// Streams
+	var waitingForDrain = [];
+	var ended = false;
+
+	var fileNames = '';
+	function tryEnd() {
+		if (ended) {
+			return;
+		}
+		var endNow = !process.stdin.readable;
+		for (var j = 0; j < msStreams.length; ++j) {
+			endNow = endNow && !msStreams[j].writable;
+		}
+		if (endNow) {
+			ended = true;
+			if (!msTestMode) {
+				msUploadFiles(opts);
+			} else {
+				console.log(fileNames);
+			}
+		}
+	}
+
+	// Carrier for stdin
+	carrier = mod_carrier.carry(process.stdin);
+
+	carrier.on('line', function (line) {
+		var ws = msStreams[selectReducer(line, opts)];
+		var flushed = ws.write(line);
+		flushed = ws.write('\n') && flushed;
+		if (!flushed) {
+			if (waitingForDrain.indexOf(ws) === -1) {
+				waitingForDrain.push(ws);
+			}
+			process.stdin.pause();
+		}
+	});
+
+	carrier.once('error', function (err) {
+		msFatal('error with stdin: ' + err.message);
+	});
+
+	carrier.once('end', function () {
+		for (i = 0; i < opts.nReducers; ++i) {
+			msStreams[i].end();
+		}
+		tryEnd();
+	});
+
+	// Set up file write streams
+	for (i = 0; i < opts.nReducers; ++i) {
+		var filename = msTmpFilePrefix + i;
+		fileNames += filename + '\n';
+		var stream = mod_fs.createWriteStream(filename);
+		stream.filename = filename;
+
+		stream.once('open', function () {
+			msStreams.push(this);
+			if (msStreams.length === opts.nReducers) {
+				process.stdin.resume();
+			}
+		}.bind(stream));
+
+		stream.on('drain', function () {
+			var index = waitingForDrain.indexOf(this);
+			if (index !== -1) {
+				waitingForDrain.splice(index, 1);
+			}
+			if (waitingForDrain.length === 0) {
+				process.stdin.resume();
+			}
+		}.bind(stream));
+
+		stream.once('error', function (err) {
+			msFatal('File: ' + this.filename + ': ' +
+				err.message);
+		}.bind(stream));
+
+		stream.once('close', function () {
+			if (process.stdin.readable) {
+				msFatal('File: ' + this.filename + ': ' +
+					'write stream closed prematurely');
+				return;
+			}
+			tryEnd();
+		}.bind(stream));
+	}
+}
+
+// Only factored out so that the large comment isn't duplicated everywhere.
+function parseJson(line)
+{
+	if (line === '') {
+		return (null);
+	}
+	var obj = null;
+	try {
+		obj = JSON.parse(line);
+	} catch (e) {
+		// The options we had here were to (1) use the line as the key,
+		// (2) ignore the line completely, or (3) blow up.  (3) seemed
+		// like the best thing to do sine (1) is hard to debug and (3)
+		// would cause data to mysteriously disappear.
+		msFatal('error: input is not json: ' + line);
+	}
+	return (obj);
+}
+
+function constructExecFunc(opts)
+{
+	var exec = opts.exec;
+	if (exec.indexOf('return') === -1) {
+		if (exec.substring(exec.length - 1) === ';') {
+			exec = exec.substring(0, exec.length - 1);
+		}
+		exec = 'return (' + exec + ')';
+	}
+	return (new Function('line', exec));
+}
+
+function parseAndExec(line, opts)
+{
+	var func = opts.execFunc;
+	var parse = opts.parseJson;
+
+	var thiz = null;
+	if (parse) {
+		thiz = parseJson(line);
+	} else {
+		thiz = { line: line };
+	}
+
+	var key = func.call(thiz, line);
+
+	// Blow up if the key isn't a String
+	var t = typeof (key);
+	if (t !== 'string') {
+		msFatal(key + ' must be of type string, but was type ' + t);
+	}
+
+	return (key);
+}
+
+function parseLikeCut(line, opts)
+{
+	var delimiter = opts.delimiter;
+	var fields = opts.fields;
+	var parts = line.split(delimiter);
+	var key = '';
+	for (var i = 0; i < fields.length; ++i) {
+		// Taking a page out of cut's playbook. if the field can't be
+		// found we simply don't use it.
+		if (!parts[fields[i] - 1]) {
+			continue;
+		}
+
+		if (key) {
+			key += delimiter;
+		}
+		// The - 1 here is because the fields are specified starting
+		// at 1 and not 0.
+		key += parts[fields[i] - 1];
+	}
+	return (key);
+}
+
+function parseLikeJson(line, opts)
+{
+	var delimiter = opts.delimiter;
+	var fields = opts.fields;
+	var obj = parseJson(line);
+	var key = '';
+	for (var i = 0; i < fields.length; ++i) {
+		var parts = fields[i].split('.');
+		var datum = obj[parts[0]];
+		for (var j = 1; datum && j < parts.length; ++ j) {
+			datum = datum[parts[j]];
+		}
+
+		// Taking a page out of cut's playbook. if the field can't be
+		// found we simply don't use it.
+		if (datum === undefined) {
+			continue;
+		}
+
+		if (key) {
+			key += delimiter;
+		}
+		key += datum;
+	}
+	return (key);
+}
+
+function selectReducer(line, opts)
+{
+	var nReducers = opts.nReducers;
+	var key = opts.parseKey(line, opts);
+	if (msTestMode) {
+		console.error(line + ' => { hash_key:' + key + ' }');
+	}
+	var hash = mod_crypto.createHash(msHashAlgo);
+	hash.update(key);
+	var digest = hash.digest('hex');
+	var digestNumber = parseInt(digest.substr(0, 8), 16);
+	return (digestNumber % nReducers);
+}
+
+function usage(message)
+{
+	console.error('msplit: ' + message);
+	console.error('\n' + msUsageMessage);
+	process.exit(2);
+}
+
+function msFatal(message)
+{
+	console.error('msplit: ' + message);
+	process.exit(1);
+}
+
+function msUploadFile(args, cb)
+{
+	mod_macommon.mantaFileSave(args, function (err) {
+		if (err) {
+			args.log.fatal(err, 'Error uploading file');
+			process.exit(1);
+		}
+		cb(args);
+	}, false);
+}
+
+function msUploadFiles(opts)
+{
+	var log = new mod_bunyan({ 'name': 'msplit',
+				    'level': 'fatal',
+				    'stream': process.stderr
+				    });
+
+	var client = mod_manta.createClient({
+		'url': process.env['MANTA_URL'],
+		'log': log,
+		'retry': false,
+		'sign': mod_macommon.mantaSignNull
+	});
+
+	var uploaded = 0;
+	for (var i = 0; i < opts.nReducers; ++i) {
+		var filename = msTmpFilePrefix + i;
+		var objname = msObjPrefix + i;
+		msUploadFile({
+			'client': client,
+			'filename': filename,
+			'key': objname,
+			'log': log,
+			'iostream': 'stdout',
+			'rIdx': i
+		}, function (args) {
+			++uploaded;
+			if (uploaded === opts.nReducers) {
+				process.exit(0);
+			}
+		});
+	}
+}
+
+main();
