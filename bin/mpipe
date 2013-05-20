@@ -11,7 +11,7 @@ var mod_getopt = require('posix-getopt');
 var mod_manta = require('manta');
 var mod_uuid = require('node-uuid');
 
-var mod_mautil = require('../lib/util');
+var mod_macommon = require('../lib/common');
 
 /*
  * mpipe: distributed pipe
@@ -136,10 +136,10 @@ function dpUploadFile()
 	    'url': process.env['MANTA_URL'],
 	    'log': log,
 	    'retry': false,
-	    'sign': mod_mautil.mantaSignNull
+	    'sign': mod_macommon.mantaSignNull
 	});
 
-	mod_mautil.mantaFileSave({
+	mod_macommon.mantaFileSave({
 	    'client': client,
 	    'filename': dpTmpfile,
 	    'headers': dpHeaders,
