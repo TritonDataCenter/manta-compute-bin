@@ -1,0 +1,82 @@
+.TH mpipe 1 "May 2013" Manta "Manta Compute Bin"
+.SH NAME
+.PP
+mpipe \- advanced output pipe for the current task
+.SH SYNOPSIS
+.PP
+\fB\fCmpipe\fR [\-p] [\-r rIdx] [\-H header:value ...] [manta path]
+.SH DESCRIPTION
+.PP
+Each invocation of mpipe reads data from stdin, potentially buffers it to local
+disk, and saves it as task output.  If a Manta path is given, the output is
+saved to that path.  Otherwise, the object is stored with a unique name in the
+job's directory.  If \-p is given, required parent directories are automatically
+created (like "mkdir \-p").
+.PP
+If you use mpipe in a task, the task's stdout will not be captured and saved as
+it is by default.
+.PP
+As a simple example,
+.PP
+.RS
+.nf
+$ wc | mpipe
+.fi
+.RE
+.PP
+is exactly equivalent to just:
+.PP
+.RS
+.nf
+$ wc
+.fi
+.RE
+.PP
+since both capture the stdout of wc and emit it as a single output object.  But
+you use mpipe for several reasons:
+.RS
+.IP \(bu 2
+\fBNaming\fP: Objects created through automatic stdout capture or through mpipe
+with no arguments are automatically given unique names.  You can control the
+name yourself by specifying an argument to mpipe:
+.PP
+$ wc | mpipe /$MANTA_USER/stor/count
+.RE
+.PP
+A job that creates thumbnails from images might use \fB\fCMANTA_INPUT_OBJECT\fR to
+infer the desired path for the thumbnail (e.g.,
+\fB\fC${MANTA_INPUT_OBJECT}-thumb.png\fR) and then use mpipe to store the output there.
+* \fBMultiple outputs\fP: you can invoke mpipe as many times as you want from a
+  single task to emit more than one object for the next phase (or as a final job
+  output).  A job that chunks up daily log files into hourly ones for subsequent
+  per\-hour processing would use this to emit 24 outputs for each input.
+* \fBSpecial headers\fP: You can specify headers to be set on output objects using
+  the "\-H" option to mpipe, which behaves exactly like the same option on the
+  Manta CLI tool \fB\fCmput\fR.
+* \fBReducer routing\fP: Finally, in jobs with multiple reducers in a single
+  phase, you can specify which reducer a given output object should be routed to
+  using the "\-r" option to mpipe.  See "Multiple reducers" below.
+.SH EXAMPLES
+.PP
+.RS
+.nf
+$ wc | mpipe -H 'Access-Control-Allow-Origin: *' /$MANTA_USER/public/wc.txt
+$ .. | mpipe -r 2
+.fi
+.RE
+.SH OPTIONS
+.TP
+\fB\fC-H '[http-header]: [value]'\fR
+Headers to set on the resulting PUT request to Manta.  For example,
+\fB\fCAccess-Control-Allow-Origin: *\fR.
+.TP
+\fB\fC-p\fR
+Turns off retries if a PUT fails.
+.TP
+\fB\fC-r\fR
+Send the output to a specific reducer.
+.SH BUGS
+.PP
+Report bugs at Github
+.UR https://github.com/joyent/manta-compute-bin/issues
+.UE

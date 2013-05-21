@@ -1,0 +1,50 @@
+.TH maggr 1 "May 2013" Manta "Manta Compute Bin"
+.SH NAME
+.PP
+maggr \- performs key\-wise aggregation on plain text files.
+.SH SYNOPSIS
+.PP
+\fB\fCmaggr\fR [\-c#=[op list] \-c#=[op list] ...]
+        [\-f file] [\-d input delimiter] [\-o output delimiter]
+        [\-i inner output delimiter] [op list]
+\fB\fCmaggr\fR \-l
+.SH DESCRIPTION
+.PP
+\fB\fCmaggr\fR produces statistics from text streams.  To get the current list of
+supported aggregation functions, invoke \fB\fCmaggr -l\fR.
+.SH EXAMPLES
+.PP
+.RS
+.nf
+$ echo -e 'foo 1\\nbar 1\\nfoo 2\\nfoo 5' | ./bin/maggr sum,mean
+foo 8,2.6666666666666665
+bar 1,1
+.fi
+.RE
+.SH OPTIONS
+.TP
+\fB\fC-c\fR
+Specify a list of operations to perform on a column.  Column numbers begin at
+1.  You can specify multiple operations, separated by a ','.  For example,
+to get the mean of the fifth field: \fB\fC-c5=mean\fR.
+.TP
+\fB\fC-d\fR
+String that separates the input columns.
+.TP
+\fB\fC-f\fR
+Read from file instead of reading from stdin.
+.TP
+\fB\fC-i\fR
+String that separates results for a single column when multiple operations
+are specified.
+.TP
+\fB\fC-l\fR
+Lists supported operations.
+.TP
+\fB\fC-o\fR
+String that separates the columns in the output.
+.SH BUGS
+.PP
+Report bugs at Github
+.UR https://github.com/joyent/manta-compute-bin/issues
+.UE

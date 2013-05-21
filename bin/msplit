@@ -71,7 +71,7 @@ var msUsageMessage = [
 	'   {"id":"1234567890-22-0987654321", "name":...}',
 	'',
 	'You can use the first 9 characters of the id field with:',
-	'   ... | msplit -e "this.id.substring(0,9)" -n 4'
+	'   ... | msplit -j -e "this.id.substring(0,9)" -n 4'
 ].join('\n');
 
 var msHashAlgo = 'md5';

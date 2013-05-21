@@ -1,0 +1,37 @@
+.TH mtee 1 "May 2013" Manta "Manta Compute Bin"
+.SH NAME
+.PP
+mtee \- capture stdin and write to both stdout and a Manta object.
+.SH SYNOPSIS
+.PP
+\fB\fCmtee\fR [manta object]
+.SH DESCRIPTION
+.PP
+\fB\fCmtee\fR is like \fB\fCmput\fR, but takes input on stdin instead of a file, and emits its
+input on stdout as well, much like 
+.BR tee (1).
+.PP
+\fB\fCmtee\fR is also similar to \fB\fCmpipe\fR, except that the newly created object does
+\fInot\fP become an output object for the current task, and using mtee does not
+prevent stdout from being captured.
+.PP
+For example, this will capture the output of cmd to manta object
+\fB\fC/$MANTA_USER/stor/tee.out\fR and still pipe what was coming from cmd to cmd2:
+.PP
+.RS
+.nf
+$ cmd | mtee /$MANTA_USER/stor/tee.out | cmd2
+.fi
+.RE
+.SH EXAMPLES
+.PP
+.RS
+.nf
+$ mtee /$MANTA_USER/stor/tee.out
+.fi
+.RE
+.SH BUGS
+.PP
+Report bugs at Github
+.UR https://github.com/joyent/manta-compute-bin/issues
+.UE
