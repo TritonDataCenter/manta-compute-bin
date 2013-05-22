@@ -197,11 +197,15 @@ function getOpts(argv) {
 		case 'c':
 			var split = option.optarg.split('=');
 			if (!isNumber(split[0])) {
-				usage('invalid column number');
+				usage('invalid column number: ' + split[0]);
+			}
+			if (split.length !== 2) {
+				usage('invalid column format: ' +
+				      option.optarg);
 			}
 
 			// columns are numbered from 1, awk style
-			var column = parseFloat(split[0]) - 1;
+			var column = parseInt(split[0], 10) - 1;
 			if (column < 0) {
 				usage('invalid column number');
 			}

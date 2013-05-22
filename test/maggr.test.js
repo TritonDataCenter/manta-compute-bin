@@ -78,6 +78,16 @@ test('testNoOpts', function (t)
 	});
 });
 
+test('testBadColumnArgs', function (t) {
+	runTest({
+		stdin: SAMPLE_STDIN,
+		opts: ['-c1', 'key']
+	}, function (result) {
+		t.equal(2, result.code);
+		t.done();
+	});
+});
+
 test('testList', function (t)
 {
 	runTest({
