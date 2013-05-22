@@ -102,6 +102,51 @@ test('testOpList', function (t) {
 	});
 });
 
+test('testOpListWithStringColumn', function (t) {
+	runTest({
+		stdin: ['foo 1 1',
+			'bar 1 1',
+			'foo baz 1',
+			'foo 1 1',
+			'bar 1 1',
+			''
+		       ].join('\n'),
+		opts: ['-c1=key', 'sum']
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(['foo 2 2',
+			'bar 2 2',
+			''
+			].join('\n'), result.stdout);
+		t.equal('Non-number in non-key column 2. line: foo baz 1\n',
+			result.stderr);
+		t.done();
+	});
+});
+
+test('testOpListWithStringColumnFirstLine', function (t) {
+	runTest({
+		stdin: ['foo baz 1',
+			'bar 1 1',
+			'foo 1 1',
+			'foo 1 1',
+			'bar 1 1',
+			''
+		       ].join('\n'),
+		opts: ['-c1=key', 'sum']
+	}, function (result) {
+		t.equal(0, result.code);
+		// bar is the first valid line above...
+		t.equal(['bar 2 2',
+			'foo 2 2',
+			''
+			].join('\n'), result.stdout);
+		t.equal('Non-number in non-key column 2. line: foo baz 1\n',
+			result.stderr);
+		t.done();
+	});
+});
+
 test('testNoColumnDefForSomeColumns', function (t) {
 	runTest({
 		stdin: SAMPLE_STDIN,

@@ -270,38 +270,6 @@ function lineParse(delim, ops, input) {
 		carry = carrier.carry(process.openStdin());
 	}
 
-	/*
-	 * If no key was specified, either by column or globally, then we will
-	 * implicitly infer which columns should be keys based on the first
-	 * line of input. Any non-number fields in the line will determine
-	 * whether the column is used as a key or value.
-	 */
-	function firstLine(line) {
-		var columns = line.split(delim);
-		if (!ops.explicitKey) {
-			for (var col = 0; col < columns.length; col++) {
-				var colOps = ops[col] || ops.global;
-				var nopCol = 'nop' in colOps.singleOps;
-				var isNum = isNumber(columns[col]);
-
-				if (!nopCol && !isNum) {
-					ops[col] = {};
-					ops[col].singleOps = {
-						key: true
-					};
-					ops[col].outputOps = {
-						key: true
-					};
-					ops[col].postOps = {};
-				}
-
-			}
-		}
-		carry.removeListener('line', firstLine);
-		carry.on('line', onLine);
-		onLine(line);
-	}
-
 	function onLine(line) {
 		var columns = line.split(delim);
 		var key = '';
@@ -321,8 +289,8 @@ function lineParse(delim, ops, input) {
 				if (isNaN(num)) {
 					ignore = true;
 					console.warn('Non-number in non-key ' +
-						'column ' + col + '. ' +
-						'line: ' + line);
+						     'column ' + (col + 1) +
+						     '. ' + 'line: ' + line);
 					break;
 				}
 				values[col] = num;
@@ -333,7 +301,7 @@ function lineParse(delim, ops, input) {
 		}
 	}
 
-	carry.on('line', firstLine);
+	carry.on('line', onLine);
 	carry.on('error', e.emit.bind(e, 'error'));
 	carry.once('end', e.emit.bind(e, 'end'));
 	return (e);
