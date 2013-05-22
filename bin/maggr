@@ -69,7 +69,10 @@ var msUsage = [
 	'delimiter. If multiple operations were specified for a single column,',
 	'results will be printed in the same order they were specified and',
 	'separated by the delimiter specified by the -i option, otherwise by',
-	'commas.'
+	'commas.',
+	'',
+	'If [op list] is not specified and a column definition isn\'t',
+	'specifically given, then column definition wil default to nop.'
 ].join('\n');
 
 function usage(errstring) {
@@ -239,6 +242,9 @@ function getOpts(argv) {
 		if ('key' in opts.ops.global) {
 			opts.ops.explicitKey = true;
 		}
+	} else {
+		// No ops list, default everything to nop
+		opts.ops.global = processOps(['nop']);
 	}
 
 	opts.inputDelimiter = opts.inputDelimiter || ' ';

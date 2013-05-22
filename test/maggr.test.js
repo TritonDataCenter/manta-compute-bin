@@ -88,6 +88,34 @@ test('testBadColumnArgs', function (t) {
 	});
 });
 
+test('testOpList', function (t) {
+	runTest({
+		stdin: SAMPLE_STDIN,
+		opts: ['-c1=key', '-c2=nop', 'sum']
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(['foo 6 8',
+			'bar 3 4',
+			''
+			].join('\n'), result.stdout);
+		t.done();
+	});
+});
+
+test('testNoColumnDefForSomeColumns', function (t) {
+	runTest({
+		stdin: SAMPLE_STDIN,
+		opts: ['-c1=key', '-c4=sum']
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(['foo 8',
+			'bar 4',
+			''
+			].join('\n'), result.stdout);
+		t.done();
+	});
+});
+
 test('testList', function (t)
 {
 	runTest({
@@ -229,23 +257,6 @@ test('testMultipleOpsMultipleColsSeparator', function (t) {
 		t.done();
 	});
 });
-
-/**
- * joyent/manta-compute-bin#4
- * test('testNoColumnDefForSomeColumns', function (t) {
- * 	runTest({
- * 		stdin: SAMPLE_STDIN,
- * 		opts: ['-c1=key', '-c4=sum']
- * 	}, function (result) {
- * 		t.equal(0, result.code);
- * 		t.equal(['foo 8',
- * 			'bar 4',
- * 			''
- * 			].join('\n'), result.stdout);
- * 		t.done();
- * 	});
- * });
- */
 
 test('testColumnOutOfBounds', function (t) {
 	runTest({
