@@ -46,13 +46,12 @@ var dpOutstream, dpInstream;
 var dpNoretry = false;
 var dpHeaders = {};
 var dpOptP = false;
-var dpTestMode = false;
 
 function main()
 {
 	var parser, option;
 
-	parser = new mod_getopt.BasicParser('H:pr:t', process.argv);
+	parser = new mod_getopt.BasicParser('H:pr:', process.argv);
 
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
@@ -79,10 +78,6 @@ function main()
 			}
 			break;
 
-		case 't':
-			dpTestMode = true;
-			break;
-
 		default:
 			/* error message already emitted by getopt */
 			mod_assert.equal('?', option.option);
@@ -96,7 +91,7 @@ function main()
 		dpNoretry = !dpOptP;
 	} else if (process.env['MANTA_OUTPUT_BASE']) {
 		dpObjkey = process.env['MANTA_OUTPUT_BASE'] + mod_uuid.v4();
-	} else if (!dpTestMode) {
+	} else {
 		/*
 		 * User programs invoking "mpipe" are expected to pass through
 		 * the environment they were created with, which will contain
@@ -112,13 +107,7 @@ function main()
 
 	console.error('saving stdin to %s', dpTmpfile);
 	dpOutstream = mod_fs.createWriteStream(dpTmpfile);
-	dpOutstream.on('close', function () {
-		if (!dpTestMode) {
-			dpUploadFile();
-		} else {
-			console.log(dpTmpfile);
-		}
-	});
+	dpOutstream.on('close', dpUploadFile);
 	process.stdin.pipe(dpOutstream);
 	process.stdin.resume();
 	process.stdin.on('end', function () {

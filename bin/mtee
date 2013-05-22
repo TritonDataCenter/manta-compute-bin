@@ -18,17 +18,11 @@ var msUsageMessage = [
 	'object.  For example, this will capture the output of cmd to manta',
 	'object /$MANTA_USER/stor/tee.out and still pipe what was coming from',
 	'cmd to cmd2:',
-	'  $ cmd | mtee /$MANTA_USER/stor/tee.out | cmd2',
-	'',
-	'To test mtee, use the -t [output file] option which will output to',
-	'both stdout and to the file, but leave the file on the local',
-	'filesystem and not upload to manta.  If the -t option is used, the',
-	'manta_key will be ignored.'
+	'  $ cmd | mtee /$MANTA_USER/stor/tee.out | cmd2'
 ].join('\n');
 
 var mtHeaders = {};
 var mtKey = null;
-var mtTestMode = false;
 var mtTmpFile = '/var/tmp/mtee.' + process.pid;
 
 function main() {
@@ -47,13 +41,6 @@ function main() {
 			mtHeaders[p[0]] = p.slice(1).join(': ');
 			break;
 
-		case 't':
-			mtTestMode = true;
-			if (option.optarg) {
-				mtTmpFile = option.optarg;
-			}
-			break;
-
 		default:
 			/* error message already emitted by getopt */
 			mod_assert.equal('?', option.option);
@@ -66,17 +53,15 @@ function main() {
 		mtKey = process.argv[parser.optind()];
 	}
 
-	if (!mtKey && !mtTestMode) {
+	if (!mtKey) {
 		console.error('A manta object key must be specified.');
 		usage();
 	}
 
-	if (!mtTestMode) {
-		try {
-			mod_manta.checkBinEnv({});
-		} catch (err) {
-			usage(err.message);
-		}
+	try {
+		mod_manta.checkBinEnv({});
+	} catch (err) {
+		usage(err.message);
 	}
 
 	var stream = mod_fs.createWriteStream(mtTmpFile);
@@ -91,9 +76,7 @@ function main() {
 	});
 
 	stream.once('close', function () {
-		if (!mtTestMode) {
-			mtUploadFile();
-		}
+		mtUploadFile();
 	});
 
 	process.stdin.once('end', function () {

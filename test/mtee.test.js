@@ -2,8 +2,9 @@
  * tst.mtee.js: mtee tests
  */
 
-var mod_fs = require('fs');
 var mod_child_process = require('child_process');
+var mod_fs = require('fs');
+var mod_http = require('http');
 
 var mod_bunyan = require('bunyan');
 var helper = require('./helper.js');
@@ -16,11 +17,24 @@ var log = new mod_bunyan({
     'level': process.env['LOG_LEVEL'] || 'debug'
 });
 
+var after = helper.after;
+var before = helper.before;
 var test = helper.test;
+
+var PORT = 9876;
+var SERVER = null;
+var MANTA_URL = 'http://localhost:' + PORT;
 
 function runTest(opts, callback)
 {
-	var spawn = mod_child_process.spawn(mtee, opts.opts);
+	var env = {
+		env: {
+			'MANTA_URL': MANTA_URL,
+			'MANTA_NO_AUTH': 'true'
+		}
+	};
+
+	var spawn = mod_child_process.spawn(mtee, opts.opts, env);
 
 	var stdout = '';
 	spawn.stdout.on('data', function (data) {
@@ -42,17 +56,15 @@ function runTest(opts, callback)
 	});
 
 	spawn.on('close', function (code) {
-		var file = '';
-		if (opts.file) {
-			file = mod_fs.readFileSync(opts.file, 'utf8');
-		}
 		var result = {
 			stdout: stdout,
 			stderr: stderr,
-			file: file,
 			code: code,
 			error: error
 		};
+		if (opts.debug) {
+			console.log(result);
+		}
 		callback(result);
 	});
 
@@ -61,6 +73,31 @@ function runTest(opts, callback)
 		spawn.stdin.end();
 	});
 }
+
+before(function (cb) {
+	SERVER = mod_http.createServer(function (req, res) {
+		var body = '';
+		req.on('data', function (data) {
+			body += data;
+		});
+		req.on('end', function () {
+			req.body = body;
+			SERVER.requests.push(req);
+			res.writeHead(204);
+			res.end();
+		});
+	}).listen(PORT, function (err) {
+		cb(err);
+	});
+	SERVER.requests = [];
+});
+
+after(function (cb) {
+	SERVER.close(function (err) {
+		SERVER = null;
+		cb(err);
+	});
+});
 
 test('testNoOpts', function (t)
 {
@@ -73,24 +110,44 @@ test('testNoOpts', function (t)
 	});
 });
 
+
 test('testBasic', function (t)
 {
+	var path = '/MANTA_USER/stor/mtee.txt';
 	var sin = '1\n2\n3\n4\n';
-	var file = '/var/tmp/tst.mtee.js-testBasic';
 	runTest({
 		stdin: sin,
-		opts: ['-t', file],
-		file: file
+		opts: [path]
 	}, function (result) {
 		t.equal(0, result.code);
 		t.equal(sin, result.stdout);
-		t.deepEqual({
-			'code': 0,
-			'file': sin,
-			'stdout': sin,
-			'stderr': '',
-			'error': null
-		}, result);
+		t.equal(1, SERVER.requests.length);
+		var req = SERVER.requests[0];
+		t.equal(sin, req.body);
+		// Should *not* be reducer output.
+		t.ok(req.headers['x-marlin-stream'] === undefined);
+		t.equal(path, req.url);
+		t.done();
+	});
+});
+
+test('testAddHeaders', function (t)
+{
+	var path = '/MANTA_USER/stor/mtee.txt';
+	var sin = '1\n2\n3\n4\n';
+	runTest({
+		stdin: sin,
+		opts: ['-H', 'Access-Control-Origin: *', path]
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(sin, result.stdout);
+		t.equal(1, SERVER.requests.length);
+		var req = SERVER.requests[0];
+		t.equal(sin, req.body);
+		// Should *not* be reducer output.
+		t.ok(req.headers['x-marlin-stream'] === undefined);
+		t.ok('*', req.headers['access-control-origin']);
+		t.equal(path, req.url);
 		t.done();
 	});
 });
