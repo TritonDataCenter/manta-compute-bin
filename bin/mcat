@@ -41,11 +41,16 @@ var mcReducer;
 function main()
 {
 	var parser, option;
+	var port = 80;
 
-	parser = new mod_getopt.BasicParser('r:', process.argv);
+	parser = new mod_getopt.BasicParser('p:r:', process.argv);
 
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
+		case 'p':
+			port = parseInt(option.optarg, 10);
+			break;
+
 		case 'r':
 			mcReducer = parseInt(option.optarg, 10);
 			if (isNaN(mcReducer)) {
@@ -78,7 +83,7 @@ function main()
 
 		var request = mod_http.request({
 		    'host': 'localhost',
-		    'port': 80,
+		    'port': port,
 		    'method': 'PUT',
 		    'path': uri,
 		    'headers': headers

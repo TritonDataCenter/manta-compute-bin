@@ -51,6 +51,7 @@ function runTest(opts, callback)
 				var n = '/var/tmp/msplit.' + pid +
 					'.' + i;
 				files[i] = mod_fs.readFileSync(n, 'utf8');
+				mod_fs.unlinkSync(n);
 			}
 		}
 		var result = {

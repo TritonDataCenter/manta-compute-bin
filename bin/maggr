@@ -75,6 +75,7 @@ var msUsage = [
 function usage(errstring) {
 	console.warn('Error: ' + errstring);
 	console.warn(msUsage);
+	process.exit(2);
 }
 
 
@@ -124,11 +125,11 @@ function isNumber(n) {
 }
 
 function listOps() {
-	var s = '';
+	var ops = [];
 	Object.keys(OPS).forEach(function (op) {
-		s += op + ' ';
+		ops.push(op);
 	});
-	return (s);
+	return (ops.join(' '));
 }
 
 
@@ -150,18 +151,15 @@ function processOps(ops) {
 		if (op === 'key' && ops.length > 1) {
 			usage('no other operations can be specified ' +
 				'for a column marked as a key');
-			process.exit(1);
 		}
 
 		if (op === 'nop' && ops.length > 1) {
 			usage('no other operations can be specified ' +
 				'for a column marked nop');
-			process.exit(1);
 		}
 
 		if (!OPS[op])  {
 			usage('unsupported operation: ' + op);
-			process.exit(1);
 		}
 
 		if (OPS[op].deps.length === 0) {
@@ -200,14 +198,12 @@ function getOpts(argv) {
 			var split = option.optarg.split('=');
 			if (!isNumber(split[0])) {
 				usage('invalid column number');
-				process.exit(1);
 			}
 
 			// columns are numbered from 1, awk style
 			var column = parseFloat(split[0]) - 1;
 			if (column < 0) {
 				usage('invalid column number');
-				process.exit(1);
 			}
 			var ops = split[1].split(',');
 			opts.ops[column] = processOps(ops);
@@ -230,7 +226,6 @@ function getOpts(argv) {
 	if (parser.optind() >= process.argv.length && opts.ops.length <= 0) {
 		if (opts.ops.length <= 0) {
 			usage('no operations specified');
-			process.exit(1);
 		}
 	}
 
