@@ -274,7 +274,8 @@ function lineParse(delim, ops, input) {
 		var columns = line.split(delim);
 		var key = '';
 		var values = [];
-		var ignore = false;
+		var invalid = false;
+		var invalidColumn = null;
 		for (var col = 0; col < columns.length; col++) {
 			var colOps = ops[col] || ops.global;
 
@@ -287,17 +288,18 @@ function lineParse(delim, ops, input) {
 			} else {
 				var num = parseFloat(columns[col]);
 				if (isNaN(num)) {
-					ignore = true;
-					console.warn('Non-number in non-key ' +
-						     'column ' + (col + 1) +
-						     '. ' + 'line: ' + line);
+					invalid = true;
+					invalidColumn = col + 1;
 					break;
 				}
 				values[col] = num;
 			}
 		}
-		if (!ignore) {
+		if (!invalid) {
 			e.emit('line', key, values);
+		} else {
+			e.emit('invalidline',
+			       { line: line, column: invalidColumn });
 		}
 	}
 
@@ -343,6 +345,7 @@ function main() {
 	var lineParser = lineParse(opts.inputDelimiter, opts.ops,
 		opts.inputFile);
 	var results = {};
+	var exitStatus = 0;
 
 	lineParser.on('line', function (key, values) {
 		results[key] = results[key] || [];
@@ -384,6 +387,13 @@ function main() {
 		}
 	});
 
+	lineParser.on('invalidline', function (lineDetails) {
+		console.error('Non-number in non-key ' +
+			      'column ' + lineDetails.column +
+			      '. line: ' + lineDetails.line);
+		exitStatus = 1;
+	});
+
 	lineParser.once('end', function () {
 		Object.keys(results).forEach(function (key) {
 			for (var val = 0; val < results[key].length; val++) {
@@ -407,6 +417,7 @@ function main() {
 		});
 		printResults(results, opts.ops, opts.outputDelimiter,
 			opts.innerDelimiter);
+		process.exit(exitStatus);
 	});
 }
 

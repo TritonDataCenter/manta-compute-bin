@@ -113,7 +113,7 @@ test('testOpListWithStringColumn', function (t) {
 		       ].join('\n'),
 		opts: ['-c1=key', 'sum']
 	}, function (result) {
-		t.equal(0, result.code);
+		t.equal(1, result.code);
 		t.equal(['foo 2 2',
 			'bar 2 2',
 			''
@@ -135,7 +135,7 @@ test('testOpListWithStringColumnFirstLine', function (t) {
 		       ].join('\n'),
 		opts: ['-c1=key', 'sum']
 	}, function (result) {
-		t.equal(0, result.code);
+		t.equal(1, result.code);
 		// bar is the first valid line above...
 		t.equal(['bar 2 2',
 			'foo 2 2',
