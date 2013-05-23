@@ -136,7 +136,7 @@ function mtUploadFile()
 					if (err3) {
 						mtFatal(err3.message);
 					}
-					process.exit(0);
+					client.close();
 				});
 			});
 		});

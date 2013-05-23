@@ -390,11 +390,8 @@ function msUploadFiles(opts)
 				    'stream': process.stderr
 				    });
 
-	var client = mod_manta.createClient({
-		'url': process.env['MANTA_URL'],
-		'log': log,
-		'retry': false,
-		'sign': mod_macommon.mantaSignNull
+	var client = mod_manta.createBinClient({
+		'log': log
 	});
 
 	var uploaded = 0;
@@ -411,7 +408,7 @@ function msUploadFiles(opts)
 		}, function (args) {
 			++uploaded;
 			if (uploaded === opts.nReducers) {
-				process.exit(0);
+				client.close();
 			}
 		});
 	}

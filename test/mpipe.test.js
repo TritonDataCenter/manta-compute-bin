@@ -31,6 +31,7 @@ function runTest(opts, callback)
 	var env = {
 		env: {
 			'MANTA_URL': MANTA_URL,
+			'MANTA_NO_AUTH': true,
 			'MANTA_OUTPUT_BASE': MANTA_OUTPUT_BASE
 		}
 	};
