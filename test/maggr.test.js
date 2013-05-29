@@ -27,7 +27,6 @@ var SAMPLE_STDIN = [
 function runTest(opts, callback)
 {
 	var spawn = mod_child_process.spawn(maggr, opts.opts);
-
 	var stdout = '';
 	spawn.stdout.on('data', function (data) {
 		stdout += data;
@@ -175,7 +174,8 @@ test('testList', function (t)
 		 *	(since the main purpose of this test is to catch
 		 *	 additions/ommissions)
 		 */
-		t.equal('key nop count max mean min range sum\n',
+		t.equal('key nop count max mean min range sum ovariance ' +
+			    'variance stddev\n',
 			result.stderr);
 		t.done();
 	});
@@ -191,10 +191,11 @@ test('testAllOperations', function (t)
 			'foo 12'
 		       ].join('\n'),
 		opts: ['-c1=key',
-		       '-c2=count,max,mean,min,range,sum']
+			    '-c2=count,max,mean,min,range,sum,ovariance,' +
+			    'variance,stddev']
 	}, function (result) {
 		t.equal(0, result.code);
-		t.equal('foo 5,19,9.8,3,16,49\n',
+		t.equal('foo 5,19,9.8,3,16,49,36.7,36.7,6.058052492344384\n',
 			result.stdout);
 		t.done();
 	});
@@ -249,6 +250,70 @@ test('testOutputSeparator', function (t) {
 			'bar 3 4',
 			''
 			].join('\n').replace(/ /g, '~'), result.stdout);
+		t.done();
+	});
+});
+
+test('testFormatString', function (t) {
+	runTest({
+		stdin: SAMPLE_STDIN,
+		opts: ['-c1=key', '-c2=nop',
+			'-c3=sum', '-t3=%.1f',
+			'-c4=sum', '-t4=%5d']
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(['foo 6.0     8',
+			'bar 3.0     4',
+			''
+			].join('\n'), result.stdout);
+		t.done();
+	});
+});
+
+test('testMultipleOpsFormatString', function (t) {
+	runTest({
+		stdin: SAMPLE_STDIN,
+		opts: ['-c1=key', '-c2=nop',
+			'-c3=sum,count', '-t3=%.1f,%02d',
+			'-c4=sum,range', '-t4=%5d,%#x']
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(['foo 6.0,02     8,0x4',
+			'bar 3.0,01     4,0x0',
+			''
+			].join('\n'), result.stdout);
+		t.done();
+	});
+});
+
+test('testGlobalFormatString', function (t) {
+	runTest({
+		stdin: SAMPLE_STDIN,
+		opts: ['-T', '%.2f', '-c1=key', '-c2=nop',
+			'-c3=sum,count', '-t3=%0.3f',
+			'-c4=sum,range', '-t4=%#x']
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(['foo 6.000,2.00 0x8,4.00',
+			'bar 3.000,1.00 0x4,0.00',
+			''
+			].join('\n'), result.stdout);
+		t.done();
+	});
+});
+
+test('testGlobalFormatStringSkip', function (t) {
+	runTest({
+		stdin: SAMPLE_STDIN,
+		opts: ['-T', '%.2f', '-c1=key', '-c2=nop',
+			'-c3=sum,count',
+			'-c4=sum,range', '-t4=,%#x']
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(['foo 6.00,2.00 8.00,0x4',
+			'bar 3.00,1.00 4.00,0x0',
+			''
+			].join('\n'), result.stdout);
 		t.done();
 	});
 });

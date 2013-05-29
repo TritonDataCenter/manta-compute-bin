@@ -13,6 +13,7 @@ var EventEmitter = events.EventEmitter;
 var getopt = require('posix-getopt');
 var util = require('util');
 var fs = require('fs');
+var printf = require('printf');
 
 var OPS = {
 	key:    { deps: [] },
@@ -23,12 +24,17 @@ var OPS = {
 	mean:   { deps: ['sum', 'count'] },
 	min:    { deps: [] },
 	range:  { deps: ['min', 'max'] },
-	sum:    { deps: [] }
+	sum:    { deps: [] },
+	ovariance:   { deps: [] },
+	variance:    { deps: ['buffer', 'sum', 'count'] },
+	stddev: { deps: ['buffer', 'sum', 'count'] }
 };
 
 var msUsage = [
 	'USAGE:	maggr	[-c#=<op list> -c#=<op list> ...]',
+	'		[-t#=<format list> -t#=<format list> ...]',
 	'		[-f file] [-d input delimiter] [-o output delimiter]',
+	'		[-T format list]',
 	'		[-i inner output delimiter] [op list]',
 	'	maggr	-l',
 	'Example: maggr -d ":" -o "-" -c1=key -c3=nop sum,mean',
@@ -39,9 +45,15 @@ var msUsage = [
 	'		columns start at 1',
 	'		multiple operations are separated by commas (,)',
 	'',
+	'-t#<fmt list>   specify a list format patterns to perform on column #',
+	'		columns start at 1',
+	'		multiple formats are separated by commas (,)',
+	'',
 	'-d	string that separates columns in the input',
 	'',
 	'-o	string that separates columns in the output',
+	'',
+	'-T	string that represents list of format patterns for output',
 	'',
 	'-i	string that separates results for a single column when',
 	'	multiple operations are specified',
@@ -56,6 +68,14 @@ var msUsage = [
 	'specified by separating them with commas. e.g. -c2=sum,mean.',
 	'Specify operations to be performed on all other columns after all',
 	'arguments.',
+	'',
+	'Specify printf style format patterns on columns.  Specify patterns',
+	'for each column using -t#=<pattern list>, replacing # with a column.',
+	'Multiple patterns can be specified for a single column that has',
+	'multiple operations by separating them with commas. e.g.',
+	'-t2=%2d,%0.2f. Output formats for a single column can be skipped:',
+	'-t2=,%0.2f. All other output will be formatted according to the -T',
+	'option (or left unformatted if -T is unspecified). ',
 	'',
 	'Specify key columns using the "key" operation. Columns can be ignored',
 	'with the "nop" operation.',
@@ -93,6 +113,37 @@ function mean(aggr) {
 	};
 }
 
+function ovariance(value, aggr) {
+	aggr.ovariance = aggr.ovariance || {n: 0, delta: 0, mean: 0, m2: 0};
+	aggr.ovariance.n = aggr.ovariance.n + 1;
+	aggr.ovariance.delta = value - aggr.ovariance.mean;
+	aggr.ovariance.mean = aggr.ovariance.mean +
+		(aggr.ovariance.delta / aggr.ovariance.n);
+	aggr.ovariance.m2 = aggr.ovariance.m2 +
+		aggr.ovariance.delta * (value - aggr.ovariance.mean);
+	aggr.ovariance.result = aggr.ovariance.m2 / (aggr.ovariance.n - 1);
+}
+
+function variance(aggr) {
+	mean(aggr);
+	aggr.sum2 = {
+		result: 0
+	};
+
+	aggr.buffer.values.forEach(function (v) {
+		aggr.sum2.result = aggr.sum2.result +
+			(v - aggr.mean.result)*(v - aggr.mean.result);
+	});
+
+	aggr.variance = {
+		result: aggr.sum2.result / (aggr.count.result - 1)
+	};
+
+	aggr.stddev = {
+		result: Math.sqrt(aggr.variance.result)
+	};
+}
+
 function count(aggr) {
 	aggr.count = aggr.count || {};
 	aggr.count.result = aggr.count.result + 1 || 1;
@@ -124,15 +175,11 @@ function buffer(value, aggr) {
 }
 
 function isNumber(n) {
-	return (!isNaN(parseFloat(n)));
+	return (!isNaN(parseFloat(n)) && isFinite(n));
 }
 
 function listOps() {
-	var ops = [];
-	Object.keys(OPS).forEach(function (op) {
-		ops.push(op);
-	});
-	return (ops.join(' '));
+	return (Object.keys(OPS).join(' '));
 }
 
 
@@ -183,9 +230,10 @@ function processOps(ops) {
 function getOpts(argv) {
 	var opts = {};
 	opts.ops = [];
-	var option;
+	opts.fmts = [];
+	var option, split, column, fmts, ops;
 
-	var parser = new getopt.BasicParser(':d:o:i:c:f:l', argv);
+	var parser = new getopt.BasicParser(':d:o:i:c:f:t:T:l', argv);
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
 		case 'd':
@@ -198,7 +246,7 @@ function getOpts(argv) {
 			opts.innerDelimiter = option.optarg;
 			break;
 		case 'c':
-			var split = option.optarg.split('=');
+			split = option.optarg.split('=');
 			if (!isNumber(split[0])) {
 				usage('invalid column number: ' + split[0]);
 			}
@@ -208,11 +256,11 @@ function getOpts(argv) {
 			}
 
 			// columns are numbered from 1, awk style
-			var column = parseInt(split[0], 10) - 1;
+			column = parseInt(split[0], 10) - 1;
 			if (column < 0) {
 				usage('invalid column number');
 			}
-			var ops = split[1].split(',');
+			ops = split[1].split(',');
 			opts.ops[column] = processOps(ops);
 			if ('key' in opts.ops[column]) {
 				opts.ops.explicitKey = true;
@@ -220,6 +268,25 @@ function getOpts(argv) {
 			break;
 		case 'f':
 			opts.inputFile = option.optarg;
+			break;
+		case 't':
+			split = option.optarg.split('=');
+			if (!isNumber(split[0])) {
+				usage('invalid column number: ' + split[0]);
+			}
+
+			// columns are numbered from 1, awk style
+			column = parseInt(split[0], 10) - 1;
+			if (column < 0) {
+				usage('invalid column number: ' +
+				      option.optarg);
+			}
+			fmts = split[1].split(',');
+			opts.fmts[column] = fmts;
+			break;
+		case 'T':
+			fmts = option.optarg.split(',');
+			opts.fmts.global = fmts;
 			break;
 		case 'l':
 			console.warn(listOps());
@@ -312,23 +379,44 @@ function lineParse(delim, ops, input) {
 
 /*
  * Prints the result object.
- * Each key and it's aggregated columns are printed on a line.
+ * Each key and it's aggregated columns are formatted and printed on a line.
  * Columns are separated by opts.outputDelimiter
  * If multiple operations were specfied for a column, the results are separated
  * by opts.innerDelimiter.
  */
-function printResults(results, ops, delim, ifs) {
+function printResults(results, ops, fmts, delim, ifs) {
 	Object.keys(results).forEach(function (key) {
 		var line = '';
 		for (var val = 0; val < results[key].length; val++) {
 			var colOps = ops[val] || ops.global;
+			var colFmts = fmts[val] || fmts.global;
+			//colOps is the ops list for each column of data
+			//colFmts is the format list for each column of data
 
 			if ('nop' in colOps.outputOps) {
 				continue;
 			}
 
+			var fmtsIndex = 0;
 			Object.keys(colOps.outputOps).forEach(function (op) {
-				line += results[key][val][op].result + ifs;
+				var result;
+				var unfmt_result =
+					results[key][val][op].result.toString();
+				if (colFmts === undefined || op === 'key') {
+					result = unfmt_result;
+				} else if (!colFmts[fmtsIndex]) {
+					if (fmts.global === undefined) {
+						result = unfmt_result;
+					} else {
+						result = printf(fmts.global,
+							unfmt_result);
+					}
+				} else {
+					result = printf(colFmts[fmtsIndex],
+						unfmt_result);
+				}
+				fmtsIndex += 1;
+				line += result + ifs;
 			});
 
 			line = line.substring(0, line.lastIndexOf(ifs));
@@ -371,6 +459,9 @@ function main() {
 				case 'min':
 					min(value, aggr);
 					break;
+				case 'ovariance':
+				    ovariance(value, aggr);
+				    break;
 				case 'buffer':
 					buffer(value, aggr);
 					break;
@@ -405,6 +496,12 @@ function main() {
 					case 'mean':
 						mean(aggr);
 						break;
+					case 'variance':
+						variance(aggr);
+						break;
+					case 'stddev':
+						variance(aggr);
+						break;
 					case 'range':
 						range(aggr);
 						break;
@@ -415,7 +512,7 @@ function main() {
 
 			}
 		});
-		printResults(results, opts.ops, opts.outputDelimiter,
+		printResults(results, opts.ops, opts.fmts, opts.outputDelimiter,
 			opts.innerDelimiter);
 		process.exit(exitStatus);
 	});
@@ -429,6 +526,8 @@ module.exports = {
 	count: count,
 	max: max,
 	mean: mean,
+	ovariance: ovariance,
+	variance: variance,
 	min: min,
 	range: range,
 	sum: sum

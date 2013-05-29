@@ -13,6 +13,7 @@
         "memorystream": "0.2.0",
         "node-uuid": "1.4.0",
         "posix-getopt": "1.0.0",
+        "printf": "0.1.2",
         "retry": "0.6.0",
         "verror": "1.3.6"
     },
