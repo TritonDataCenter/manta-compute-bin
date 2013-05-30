@@ -10,7 +10,9 @@ SYNOPSIS
 --------
 
 `maggr` [-c#=[op list] -c#=[op list] ...]
+        [-t#=<format list> -t#=<format list> ...]
         [-f file] [-d input delimiter] [-o output delimiter]
+        [-T format list]
         [-i inner output delimiter] [op list]
 `maggr` -l
 
@@ -75,6 +77,14 @@ OPTIONS
   String that separates the columns in the output. Default is an empty space
   (" ") or the input delimiter as specified by `-d`.
 
+`-t`
+  Specify a list of format patterns to perform on a column.  Column numbers begin at
+  1.  You can specify multiple operations, separated by a ','.  For example,
+  to format the fifth field: `-t5=%.2f`.
+
+`-T`
+  String that represents list of format patters for output.
+
 OPERATIONS
 ----------
 
@@ -102,6 +112,18 @@ OPERATIONS
 
 `sum`
   Sums all values in the column.
+
+`ovariance`
+  Calculates the online variance from values in a column.  Great for when
+  counting large amounts of data and is much less prone to loss of precision.
+
+`variance`
+  Calculates the variance from values in a column.  Uses the robust two-pass
+  algorithm for computing the variance.
+
+`stddev`
+  Calculates the standard deviation from values in a column.  Based on the
+  robust two-pass algorithm for computing the variance.
 
 BUGS
 ----
