@@ -17,7 +17,7 @@ var mod_uuid = require('node-uuid');
  */
 var msUsageMessage = [
 	'usage: msplit [-n number_of_reducers] [-d delimiter] [-f field_list]',
-	'              [-j] [-e javascript]',
+	'              [-i] [-j] [-e javascript]',
 	'',
 	'msplit is used to split a stream into many mpipes, one per the number',
 	'of reducers for your job.  The -n option specifies the number of',
@@ -55,11 +55,11 @@ var msUsageMessage = [
 	'function signature:',
 	'   function (line) { ... }',
 	'',
-	'A string must be returned from the function.  To reduce the size of',
-	'one-liners, if msplit detects no \'return\', it will enclose the code',
-	'in \'return ( ... )\'.  For example, if you are parsing text and want',
-	'the partition key to be the first 16 characters, either of these',
-	'will work:',
+	'A string must be returned from the function unless the -i flag is ',
+	'used.  To reduce the size of one-liners, if msplit detects no ',
+	'\'return\', it will enclose the code in \'return ( ... )\'.  For ',
+	'example, if you are parsing text and want the partition key to be ',
+	'the first 16 characters, either of these will work:',
 	'   ... | msplit -e "return line.substring(0,16)" -n 4',
 	'   ... | msplit -e "line.substring(0,16)" -n 4',
 	'',
@@ -71,7 +71,12 @@ var msUsageMessage = [
 	'   {"id":"1234567890-22-0987654321", "name":...}',
 	'',
 	'You can use the first 9 characters of the id field with:',
-	'   ... | msplit -j -e "this.id.substring(0,9)" -n 4'
+	'   ... | msplit -j -e "this.id.substring(0,9)" -n 4',
+	'',
+	'Using the (-i) option:',
+	'The -i option turns off partition key hashing and instead treats ',
+	'the kay as the integer index of the reducer.  If you use this option ',
+	'the integer must be between 0 and number_of_reducers - 1.'
 ].join('\n');
 
 var msHashAlgo = 'md5';
@@ -86,12 +91,15 @@ function main()
 	var option;
 	var parser;
 	var opts = {};
+
 	opts.delimiter = '\t';
 	opts.fields = [];
 	opts.nReducers = null;
 	opts.parseJson = false;
+	opts.reducerSelector = selectReducerByHash;
+	opts.allowedTypes = [ 'string' ];
 
-	parser = new mod_getopt.BasicParser('d:f:n:e:jt', process.argv);
+	parser = new mod_getopt.BasicParser('d:f:n:e:ijt', process.argv);
 
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
@@ -109,6 +117,13 @@ function main()
 		case 'f':
 			var tmpFields = option.optarg.split(',');
 			opts.fields = opts.fields.concat(tmpFields);
+			break;
+
+		case 'i':
+			opts.reducerSelector = selectReducerByInt;
+			if (opts.allowedTypes.indexOf('number') === -1) {
+				opts.allowedTypes.push('number');
+			}
 			break;
 
 		case 'j':
@@ -183,7 +198,7 @@ function main()
 	carrier = mod_carrier.carry(process.stdin);
 
 	carrier.on('line', function (line) {
-		var ws = msStreams[selectReducer(line, opts)];
+		var ws = msStreams[opts.reducerSelector(line, opts)];
 		var flushed = ws.write(line);
 		flushed = ws.write('\n') && flushed;
 		if (!flushed) {
@@ -244,6 +259,8 @@ function main()
 	}
 }
 
+//--- Helpers
+
 // Only factored out so that the large comment isn't duplicated everywhere.
 function parseJson(line)
 {
@@ -275,10 +292,13 @@ function constructExecFunc(opts)
 	return (new Function('line', exec));
 }
 
+//--- Parsers
+
 function parseAndExec(line, opts)
 {
 	var func = opts.execFunc;
 	var parse = opts.parseJson;
+	var allowedTypes = opts.allowedTypes;
 
 	var thiz = null;
 	if (parse) {
@@ -291,8 +311,9 @@ function parseAndExec(line, opts)
 
 	// Blow up if the key isn't a String
 	var t = typeof (key);
-	if (t !== 'string') {
-		msFatal(key + ' must be of type string, but was type ' + t);
+	if (allowedTypes.indexOf(t) === -1) {
+		msFatal(key + ' must be one of types [' +
+			allowedTypes.join(', ') + '], but was type ' + t);
 	}
 
 	return (key);
@@ -348,7 +369,9 @@ function parseLikeJson(line, opts)
 	return (key);
 }
 
-function selectReducer(line, opts)
+//--- Reducer Selectors
+
+function selectReducerByHash(line, opts)
 {
 	var nReducers = opts.nReducers;
 	var key = opts.parseKey(line, opts);
@@ -357,6 +380,19 @@ function selectReducer(line, opts)
 	var digest = hash.digest('hex');
 	var digestNumber = parseInt(digest.substr(0, 8), 16);
 	return (digestNumber % nReducers);
+}
+
+function selectReducerByInt(line, opts)
+{
+	var nReducers = opts.nReducers;
+	var key = opts.parseKey(line, opts);
+	var iKey = parseInt(key, 10);
+	if (isNaN(iKey) || iKey < 0 || iKey >= nReducers) {
+		msFatal('Parsed ' + key + ' as ' + iKey + ' out of line: ' +
+			line + '\nWhich is not a number or not within the ' +
+			'valid range of reducers.');
+	}
+	return (iKey);
 }
 
 function usage(message)

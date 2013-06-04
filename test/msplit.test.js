@@ -274,3 +274,40 @@ test('testExecWithTrailingSemicolon', function (t)
 		t.done();
 	});
 });
+
+test('testReducerTargetingWithDashI', function (t)
+{
+	var sin = '1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n';
+	runTest({
+		stdin: sin,
+		opts: ['-i', '-n', 3, '-e',
+		       'parseInt(line, 10) % 3'],
+		nReducers: 3
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(3, SERVER.requests.length);
+		var reqs = transformRequests(t, SERVER.requests);
+		t.deepEqual({
+			'0': '3\n6\n9\n',
+			'1': '1\n4\n7\n10\n',
+			'2': '2\n5\n8\n'
+		}, reqs);
+		t.ok(result.error === null);
+		t.done();
+	});
+});
+
+test('testDashIOutOfRange', function (t)
+{
+	var sin = '1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n';
+	runTest({
+		stdin: sin,
+		opts: ['-i', '-n', 2, '-e',
+		       '4'],
+		nReducers: 2
+	}, function (result) {
+		t.equal(1, result.code);
+		t.equal(0, SERVER.requests.length);
+		t.done();
+	});
+});

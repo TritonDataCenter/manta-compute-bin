@@ -83,6 +83,7 @@ EXAMPLES
     $ msplit -j -f id,type -n 4
     $ msplit -e "return line.substring(0,16)" -n 4
     $ msplit -j -e "this.id.substring(0,9)" -n 4
+    $ msplit -i -j -e "this.latency % 4" -n 4
 
 OPTIONS
 -------
@@ -97,6 +98,13 @@ OPTIONS
   List of fields to use as the partitioning key.  If processing delimited text,
   must be a number.  If processing with the -j option, must be a field in the
   json object.
+
+`-i`
+  Rather than splitting to reducers based on the hash of the partition key,
+  parse the field as an integer and use it as the literal index to the reducer.
+  Must be between 0 and number_of_reducers - 1.  Note that if you use this
+  option you are taking on the resposibility of even distribution of your data
+  between reducers.
 
 `-j`
   Process the input as newline-separated json objects.
