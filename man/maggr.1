@@ -5,7 +5,9 @@ maggr \- performs key\-wise aggregation on plain text files.
 .SH SYNOPSIS
 .PP
 \fB\fCmaggr\fR [\-c#=[op list] \-c#=[op list] ...]
+        [\-t#=<format list> \-t#=<format list> ...]
         [\-f file] [\-d input delimiter] [\-o output delimiter]
+        [\-T format list]
         [\-i inner output delimiter] [op list]
 \fB\fCmaggr\fR \-l
 .SH DESCRIPTION
@@ -19,6 +21,24 @@ supported aggregation functions, invoke \fB\fCmaggr -l\fR.
 $ echo -e 'foo 1\\nbar 1\\nfoo 2\\nfoo 5' | ./bin/maggr sum,mean
 foo 8,2.6666666666666665
 bar 1,1
+$ echo -e '1 2\\n3 4\\n5 6\\n7 8' | ./bin/maggr -c2=sum mean
+4 20
+$ echo -e '1 2 3\\n4 5 6\\n7 8 9' | ./bin/maggr -c2=sum,max mean,min
+4,1 15,8 6,3
+$ echo -e 'foo 1\\nbar 1\\nfoo 2\\nfoo 5' | \\
+    ./bin/maggr -c1=key -c2=count,sum sum
+foo 3,8 12
+bar 1,1 3
+$ echo -e 'foo:1:2:3\\nbar:4:5:6\\nfoo:7:8:9\\nbaz:10:11:12' | \\
+    ./bin/maggr -d ':' -o '-' -c1=key sum
+foo-8-10-12
+bar-4-5-6
+baz-10-11-12
+$ echo -e 'foo 1 2 3\\nbar 4 5 6\\nfoo 7 8 9\\nbaz 10 11 12' | \\
+    ./bin/maggr -i "#" -c1=key -c2=sum,mean -c3=count
+foo 8#4 2
+bar 4#4 1
+baz 10#10 1
 .fi
 .RE
 .SH OPTIONS
@@ -29,20 +49,68 @@ Specify a list of operations to perform on a column.  Column numbers begin at
 to get the mean of the fifth field: \fB\fC-c5=mean\fR.
 .TP
 \fB\fC-d\fR
-String that separates the input columns.
+String that separates the input columns. Default is an empty space (" ").
 .TP
 \fB\fC-f\fR
 Read from file instead of reading from stdin.
 .TP
 \fB\fC-i\fR
 String that separates results for a single column when multiple operations
-are specified.
+are specified. Default is a comma (",").
 .TP
 \fB\fC-l\fR
 Lists supported operations.
 .TP
 \fB\fC-o\fR
-String that separates the columns in the output.
+String that separates the columns in the output. Default is an empty space
+(" ") or the input delimiter as specified by \fB\fC-d\fR.
+.TP
+\fB\fC-t\fR
+Specify a list of format patterns to perform on a column.  Column numbers begin at
+1.  You can specify multiple operations, separated by a ','.  For example,
+to format the fifth field: \fB\fC-t5=%.2f\fR.
+.TP
+\fB\fC-T\fR
+String that represents list of format patters for output.
+.SH OPERATIONS
+.TP
+\fB\fCkey\fR
+Treats the column as a key column. Aggregation will be performed for each set
+of keys found in the specified key 
+.BR column (s).
+.TP
+\fB\fCnop\fR
+Ignores the column.
+.TP
+\fB\fCcount\fR
+Counts the number of rows.
+.TP
+\fB\fCmax\fR
+Finds the maximum value.
+.TP
+\fB\fCmean\fR
+Calulates the mean (average) value.
+.TP
+\fB\fCmin\fR
+Finds the minimum value.
+.TP
+\fB\fCrange\fR
+Calculates the range of the values in the column.
+.TP
+\fB\fCsum\fR
+Sums all values in the column.
+.TP
+\fB\fCovariance\fR
+Calculates the online variance from values in a column.  Great for when
+counting large amounts of data and is much less prone to loss of precision.
+.TP
+\fB\fCvariance\fR
+Calculates the variance from values in a column.  Uses the robust two\-pass
+algorithm for computing the variance.
+.TP
+\fB\fCstddev\fR
+Calculates the standard deviation from values in a column.  Based on the
+robust two\-pass algorithm for computing the variance.
 .SH BUGS
 .PP
 Report bugs at Github

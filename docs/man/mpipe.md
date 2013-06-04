@@ -63,6 +63,9 @@ EXAMPLES
 OPTIONS
 -------
 
+`-f [file name]`
+  Treats the contents of `file name` as stdin.
+
 `-H '[http-header]: [value]'`
   Headers to set on the resulting PUT request to Manta.  For example,
   `Access-Control-Allow-Origin: *`.

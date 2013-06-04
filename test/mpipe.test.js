@@ -185,3 +185,55 @@ test('testNamedOutput', function (t)
 		t.done();
 	});
 });
+
+test('testFileUpload', function (t)
+{
+	var fileName = '/var/tmp/mpipe.test.file.' + process.pid;
+	var data = '1\n2\n3\n4\n';
+	mod_fs.writeFileSync(fileName, data);
+	runTest({
+		stdin: '',
+		opts: ['-f', fileName]
+	}, function (result) {
+		t.equal(0, result.code);
+		t.ok(!result.error);
+		t.ok(result.stdout.indexOf(MANTA_OUTPUT_BASE) === 0);
+		t.equal(1, SERVER.requests.length);
+		var req = SERVER.requests[0];
+		t.equal(data, req.body);
+		t.ok('stdout', req.headers['x-manta-stream']);
+		t.done();
+	});
+});
+
+test('testFileUploadTargetingReducer', function (t)
+{
+	var fileName = '/var/tmp/mpipe.test.file.' + process.pid;
+	var data = '1\n2\n3\n4\n';
+	mod_fs.writeFileSync(fileName, data);
+	runTest({
+		stdin: '',
+		opts: ['-f', fileName, '-r', 1]
+	}, function (result) {
+		t.equal(0, result.code);
+		t.ok(!result.error);
+		t.ok(result.stdout.indexOf(MANTA_OUTPUT_BASE) === 0);
+		t.equal(1, SERVER.requests.length);
+		var req = SERVER.requests[0];
+		t.equal(data, req.body);
+		t.ok('stdout', req.headers['x-manta-stream']);
+		t.equal('1', req.headers['x-manta-reducer']);
+		t.done();
+	});
+});
+
+test('testFileDoesntExist', function (t)
+{
+	runTest({
+		stdin: '',
+		opts: ['-f', '/var/tmp/mpipetestfiledoesntexist']
+	}, function (result) {
+		t.equal(2, result.code);
+		t.done();
+	});
+});

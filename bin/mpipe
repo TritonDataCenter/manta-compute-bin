@@ -37,27 +37,48 @@ var dpUsageMessage = [
     'random.',
     '',
     'The optional -H option is used to add headers to the object.  It can be',
-    'specified multiple times.'
+    'specified multiple times.',
+    '',
+    'The optional -f [file] option will make mpipe bypass reading stdin and',
+    'instead upload the file as if the file was stdin.'
 ].join('\n');
 
-var dpTmpfile = '/var/tmp/mpipe.' + process.pid;
+var dpHeaders = {};
 var dpObjkey, dpReducer;
+var dpOptP = false;
 var dpOutstream, dpInstream;
 var dpNoretry = false;
-var dpHeaders = {};
-var dpOptP = false;
+var dpSkipStdin = false;
+var dpTmpfile = '/var/tmp/mpipe.' + process.pid;
 
 function main()
 {
 	var parser, option;
 
-	parser = new mod_getopt.BasicParser('H:pr:', process.argv);
+	parser = new mod_getopt.BasicParser('f:H:pr:', process.argv);
 
 	while ((option = parser.getopt()) !== undefined) {
+		var m = undefined;
 		switch (option.option) {
+		case 'f':
+			dpTmpfile = option.optarg;
+			var stat = null;
+			try {
+				stat = mod_fs.statSync(dpTmpfile);
+			} catch (e) {
+			}
+
+			if (!dpTmpfile || !stat || !stat.isFile()) {
+				m = 'mpipe: file ' + dpTmpfile + ' does ' +
+					'not exist or is not readable.';
+				console.error(m);
+				usage();
+			}
+			dpSkipStdin = true;
+			break;
 		case 'H':
 			if (option.optarg.indexOf(': ') === -1) {
-				var m = 'mpipe: headers must be in the ' +
+				m = 'mpipe: headers must be in the ' +
 					'format [header]: [value].';
 				console.error(m);
 				usage();
@@ -105,14 +126,18 @@ function main()
 		process.exit(2);
 	}
 
-	console.error('saving stdin to %s', dpTmpfile);
-	dpOutstream = mod_fs.createWriteStream(dpTmpfile);
-	dpOutstream.on('close', dpUploadFile);
-	process.stdin.pipe(dpOutstream);
-	process.stdin.resume();
-	process.stdin.on('end', function () {
-		dpOutstream.end();
-	});
+	if (dpSkipStdin) {
+		dpUploadFile();
+	} else {
+		console.error('saving stdin to %s', dpTmpfile);
+		dpOutstream = mod_fs.createWriteStream(dpTmpfile);
+		dpOutstream.on('close', dpUploadFile);
+		process.stdin.pipe(dpOutstream);
+		process.stdin.resume();
+		process.stdin.on('end', function () {
+			dpOutstream.end();
+		});
+	}
 }
 
 function usage()
