@@ -1,4 +1,4 @@
-# Manta Compute Bin
+## Manta Compute Bin
 
 [manta-compute-bin](http://joyent.github.com/manta-compute-bin) is a collection
 of utilities that are on the `$PATH` in a Manta compute job.
@@ -6,7 +6,7 @@ of utilities that are on the `$PATH` in a Manta compute job.
 If you aren't familiar with Manta, please see [the Manta landing
 page](http://www.joyent.com/manta).
 
-# Introduction
+## Introduction
 
 Each of these utilities aids in proceesing and moving data around within a Manta
 compute job.  Recall that each phase of a Manta job is expressed in terms of a
@@ -20,7 +20,7 @@ to capture that part of the pipeline to a Manta object:
 
    grep foo | mtee /$MANTA_USER/stor/grep_foo.txt | cut -f 4 | sort | uniq -c
 
-# Utilities
+## Utilities
 
 The current set of utilities:
 
@@ -36,6 +36,18 @@ Manta object.
 
 Detailed documentation that can be found by clicking one of the command names
 above.
+
+## Testing in Manta Compute
+If you are testing changes or forked this repository, you can upload and run
+your changes in Manta Compute with something like:
+
+   $ make bundle
+   $ mput -f manta-compute-bin.tar.gz /$MANTA_USER/stor/manta-compute-bin.tar.gz
+   $ echo ... | mjob create \
+     -s /$MANTA_USER/stor/manta-compute-bin.tar.gz \
+     -m "cd /assets/ && gtar -xzf $MANTA_USER/stor/manta-compute-bin.tar.gz &&\
+         cd manta-compute-bin && ./bin/msplit -n 3" \
+     -r "cat" --count 3
 
 ## License
 

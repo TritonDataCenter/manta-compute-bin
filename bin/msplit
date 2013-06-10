@@ -8,8 +8,8 @@ var mod_carrier = require('carrier');
 var mod_crypto = require('crypto');
 var mod_fs = require('fs');
 var mod_getopt = require('posix-getopt');
+var mod_lib = require('../lib');
 var mod_manta = require('manta');
-var mod_macommon = require('../lib/common');
 var mod_uuid = require('node-uuid');
 
 /*
@@ -223,7 +223,9 @@ function main()
 	// Set up file write streams
 	for (i = 0; i < opts.nReducers; ++i) {
 		var filename = msTmpFilePrefix + i;
-		var stream = mod_fs.createWriteStream(filename);
+		var stream = mod_lib.createStringWriteBuffer({
+			stream: mod_fs.createWriteStream(filename)
+		});
 		stream.filename = filename;
 
 		stream.once('open', function () {
@@ -410,7 +412,7 @@ function msFatal(message)
 
 function msUploadFile(args, cb)
 {
-	mod_macommon.mantaFileSave(args, function (err) {
+	mod_lib.mantaFileSave(args, function (err) {
 		if (err) {
 			args.log.fatal(err, 'Error uploading file');
 			process.exit(1);

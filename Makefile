@@ -32,7 +32,7 @@ JSL_FILES_NODE   = $(JS_FILES)
 JSSTYLE_FILES	 = $(JS_FILES)
 JSSTYLE_FLAGS    = -f tools/jsstyle.conf
 
-CLEAN_FILES += node_modules
+CLEAN_FILES += node_modules manta-compute-bin.tar.gz
 
 include ./tools/mk/Makefile.defs
 
@@ -69,6 +69,10 @@ $(MAN_OUTDIR)/%.1: $(MAN_ROOT)/%.md | $(MAN_OUTDIR)
 .PHONY: manpages
 manpages: $(MAN_OUTPAGES)
 
+.PHONY: bundle
+bundle: all
+	tar -czf ../manta-compute-bin.tar.gz ../manta-compute-bin
+	mv ../manta-compute-bin.tar.gz .
 
 include ./tools/mk/Makefile.deps
 include ./tools/mk/Makefile.targ
