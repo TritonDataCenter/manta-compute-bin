@@ -4,7 +4,7 @@
 of utilities that are on the `$PATH` in a Manta compute job.
 
 If you aren't familiar with Manta, please see [the Manta landing
-page](http://www.joyent.com/manta).
+page](http://joyent.com/products/manta).
 
 ## Introduction
 
