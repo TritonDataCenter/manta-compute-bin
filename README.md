@@ -18,7 +18,7 @@ For example, if you had the following as your `exec` line:
 And needed to preserve the `grep foo` output, you could use the `mtee` command
 to capture that part of the pipeline to a Manta object:
 
-   grep foo | mtee /$MANTA_USER/stor/grep_foo.txt | cut -f 4 | sort | uniq -c
+    grep foo | mtee /$MANTA_USER/stor/grep_foo.txt | cut -f 4 | sort | uniq -c
 
 ## Utilities
 
