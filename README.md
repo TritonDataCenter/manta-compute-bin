@@ -41,13 +41,13 @@ above.
 If you are testing changes or forked this repository, you can upload and run
 your changes in Manta Compute with something like:
 
-   $ make bundle
-   $ mput -f manta-compute-bin.tar.gz /$MANTA_USER/stor/manta-compute-bin.tar.gz
-   $ echo ... | mjob create \
-     -s /$MANTA_USER/stor/manta-compute-bin.tar.gz \
-     -m "cd /assets/ && gtar -xzf $MANTA_USER/stor/manta-compute-bin.tar.gz &&\
-         cd manta-compute-bin && ./bin/msplit -n 3" \
-     -r "cat" --count 3
+    $ make bundle
+    $ mput -f manta-compute-bin.tar.gz /$MANTA_USER/stor/manta-compute-bin.tar.gz
+    $ echo ... | mjob create \
+      -s /$MANTA_USER/stor/manta-compute-bin.tar.gz \
+      -m "cd /assets/ && gtar -xzf $MANTA_USER/stor/manta-compute-bin.tar.gz &&\
+          cd manta-compute-bin && ./bin/msplit -n 3" \
+      -r "cat" --count 3
 
 ## License
 
