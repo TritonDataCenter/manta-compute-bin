@@ -74,7 +74,7 @@ If you are using the -j option, the object will be parsed as json and bound to
 
 You can use the first 9 characters of the id field with:
 
-    $ ... | msplit -e "this.id.substring(0,9)" -n 4
+    $ ... | msplit -j -e "this.id.substring(0,9)" -n 4
 
 EXAMPLES
 --------
