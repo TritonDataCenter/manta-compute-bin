@@ -9,19 +9,37 @@ msplit - split the output stream for the current task to many reducers.
 SYNOPSIS
 --------
 
-`msplit` [-n number_of_reducers] [-d delimiter] [-f field_list] [-j]
-         [-e javascript]
+`msplit` [-d delimiter] [-e javascript] [-f field_list] [-j] [-i]
+         [-n number_of_reducers]
+
 
 DESCRIPTION
 -----------
 
-Reads content from stdin and outputs to the number of `mpipe` processes for the
-number of reducers that are specified.  The field list is an optional list of
-fields that are used as input to the partitioning function.  The field list
-defaults to 1.  The delimiter is used to split the line to extract the key
-fields.  The delimiter defaults to (tab).  For example, this will split stdin by
-comma and use the 5th and 3rd fields for the partitioning key, going to 4
-reducers:
+Reads content from stdin and partitions data across the number of reducers that
+are specified.  This utility is used when data needs to be consistently
+localized across a set of reducers.  For example, say that you are processing
+HTTP `Referer` fields generated from your server logs and require all urls from
+a given domain to be located on the same reducer.  The same msplit invocation
+across all log files, using the domain as the `key` in the partitioning
+function, would cause all records for a given domain to end up on the same
+reducer.  This is the `map` in a traditional `map/reduce` algorithm, where data
+is "mapped" to a reducer.
+
+As a simple example, say that you have many large files of numbers and would
+like all even numbers to go to reducer 0 and all odd numbers to reducer 1.  Your
+map phase would be:
+
+    msplit -i -e "line % 2" -n 2
+
+`msplit` can be used in any non-terminal job phase (i.e. there must be a phase
+after the phase that `msplit` is run in) and produces no output.
+
+The field list is an optional list of fields that are used as input to the
+partitioning function.  The field list defaults to 1.  The delimiter is used to
+split the line to extract the key fields.  The delimiter defaults to (tab).  For
+example, this will split stdin by comma and use the 5th and 3rd fields for the
+partitioning key, going to 4 reducers:
 
     $ msplit -d ',' -f 5,3 -n 4
 
@@ -103,7 +121,7 @@ OPTIONS
   Rather than splitting to reducers based on the hash of the partition key,
   parse the field as an integer and use it as the literal index to the reducer.
   Must be between 0 and number_of_reducers - 1.  Note that if you use this
-  option you are taking on the resposibility of even distribution of your data
+  option you are taking on the responsibility of even distribution of your data
   between reducers.
 
 `-j`
