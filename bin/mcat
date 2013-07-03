@@ -8,6 +8,8 @@ var mod_path = require('path');
 var mod_assert = require('assert');
 var mod_getopt = require('posix-getopt');
 
+var mod_macommon = require('../lib/common');
+
 /*
  * mcat: emit a file by reference
  */
@@ -85,7 +87,7 @@ function main()
 		    'host': 'localhost',
 		    'port': port,
 		    'method': 'PUT',
-		    'path': uri,
+		    'path': mod_macommon.mantaObjectNameEncode(uri),
 		    'headers': headers
 		});
 
