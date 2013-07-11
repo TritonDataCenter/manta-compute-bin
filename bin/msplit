@@ -228,12 +228,12 @@ function main()
 		});
 		stream.filename = filename;
 
-		stream.once('open', function () {
-			msStreams.push(this);
-			if (msStreams.length === opts.nReducers) {
+		stream.once('open', function (index) {
+			msStreams[index] = this;
+			if (Object.keys(msStreams).length === opts.nReducers) {
 				process.stdin.resume();
 			}
-		}.bind(stream));
+		}.bind(stream, i));
 
 		stream.on('drain', function () {
 			var index = waitingForDrain.indexOf(this);
