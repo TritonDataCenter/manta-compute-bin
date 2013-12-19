@@ -29,12 +29,12 @@ var MANTA_OUTPUT_BASE = '/MANTA_USER/jobs/jobid/stor/reduce.1.';
 
 function runTest(opts, callback)
 {
+	process.env['MANTA_URL'] = MANTA_URL;
+	process.env['MANTA_NO_AUTH'] = true;
+	process.env['MANTA_OUTPUT_BASE'] = MANTA_OUTPUT_BASE;
+
 	var env = {
-		env: {
-			'MANTA_URL': MANTA_URL,
-			'MANTA_NO_AUTH': 'true',
-			'MANTA_OUTPUT_BASE': MANTA_OUTPUT_BASE
-		}
+		env: process.env
 	};
 
 	var spawn = mod_child_process.spawn(msplit, opts.opts, env);

@@ -1,4 +1,4 @@
-#!/usr/node/bin/node
+#!/usr/bin/env node
 // -*- mode: js -*-
 // Copyright (c) 2013, Joyent, Inc. All rights reserved.
 

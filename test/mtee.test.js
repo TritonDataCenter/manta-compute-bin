@@ -27,11 +27,11 @@ var MANTA_URL = 'http://localhost:' + PORT;
 
 function runTest(opts, callback)
 {
+	process.env['MANTA_URL'] = MANTA_URL;
+	process.env['MANTA_NO_AUTH'] = true;
+
 	var env = {
-		env: {
-			'MANTA_URL': MANTA_URL,
-			'MANTA_NO_AUTH': 'true'
-		}
+		env: process.env
 	};
 
 	var spawn = mod_child_process.spawn(mtee, opts.opts, env);
