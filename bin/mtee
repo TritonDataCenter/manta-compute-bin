@@ -68,7 +68,6 @@ function main() {
 	stream.once('open', function (fd) {
 		process.stdin.pipe(stream);
 		process.stdin.pipe(process.stdout);
-		process.stdin.resume();
 	});
 
 	stream.once('error', function (err) {

@@ -194,7 +194,9 @@ function main()
 		}
 	}
 
-	// Carrier for stdin
+	// Carrier for stdin.  Pause to put us into old mode.
+	process.stdin.pause();
+	process.stdin.resume();
 	carrier = mod_carrier.carry(process.stdin);
 
 	carrier.on('line', function (line) {
