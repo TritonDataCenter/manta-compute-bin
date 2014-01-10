@@ -8,7 +8,7 @@
     "dependencies": {
         "assert-plus": "0.1.2",
         "bunyan": "0.20.0",
-        "carrier": "0.1.7",
+        "lstream": "0.0.4",
         "manta": "git+ssh://git@github.com:joyent/node-manta.git#master",
         "memorystream": "0.2.0",
         "node-uuid": "1.4.0",

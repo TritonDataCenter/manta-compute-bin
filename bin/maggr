@@ -7,8 +7,8 @@
  * a command-line aggregation tool
  */
 
-var carrier = require('carrier');
 var events = require('events');
+var lstream = require('lstream');
 var EventEmitter = events.EventEmitter;
 var getopt = require('posix-getopt');
 var util = require('util');
@@ -329,12 +329,11 @@ function getOpts(argv) {
  */
 function lineParse(delim, ops, input) {
 	var e = new EventEmitter();
-	var carry;
+	var stream = new lstream();
 	if (input) {
-		carry = carrier.carry(fs.createReadStream(input,
-			{ encoding: 'utf8' }));
+		fs.createReadStream(input, { encoding: 'utf8' }).pipe(stream);
 	} else {
-		carry = carrier.carry(process.openStdin());
+		process.openStdin().pipe(stream);
 	}
 
 	function onLine(line) {
@@ -370,9 +369,10 @@ function lineParse(delim, ops, input) {
 		}
 	}
 
-	carry.on('line', onLine);
-	carry.on('error', e.emit.bind(e, 'error'));
-	carry.once('end', e.emit.bind(e, 'end'));
+	stream.on('line', onLine);
+	stream.on('error', e.emit.bind(e, 'error'));
+	stream.once('end', e.emit.bind(e, 'end'));
+	stream.resume();
 	return (e);
 }
 

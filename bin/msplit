@@ -4,9 +4,9 @@
 
 var mod_assert = require('assert');
 var mod_bunyan = require('bunyan');
-var mod_carrier = require('carrier');
 var mod_crypto = require('crypto');
 var mod_fs = require('fs');
+var mod_lstream = require('lstream');
 var mod_getopt = require('posix-getopt');
 var mod_lib = require('../lib');
 var mod_manta = require('manta');
@@ -86,7 +86,7 @@ var msTmpFilePrefix = '/var/tmp/msplit.' + process.pid + '.';
 
 function main()
 {
-	var carrier;
+	var lstream;
 	var i = 0;
 	var option;
 	var parser;
@@ -194,12 +194,10 @@ function main()
 		}
 	}
 
-	// Carrier for stdin.  Pause to put us into old mode.
-	process.stdin.pause();
-	process.stdin.resume();
-	carrier = mod_carrier.carry(process.stdin);
+	lstream = new mod_lstream();
 
-	carrier.on('line', function (line) {
+	lstream.on('line', function (line) {
+		console.error('line: "%s"', line);
 		var ws = msStreams[opts.reducerSelector(line, opts)];
 		var flushed = ws.write(line);
 		flushed = ws.write('\n') && flushed;
@@ -211,16 +209,20 @@ function main()
 		}
 	});
 
-	carrier.once('error', function (err) {
+	lstream.once('error', function (err) {
 		msFatal('error with stdin: ' + err.message);
 	});
 
-	carrier.once('end', function () {
+	lstream.once('end', function () {
 		for (i = 0; i < opts.nReducers; ++i) {
 			msStreams[i].end();
 		}
 		tryEnd();
 	});
+
+	process.stdin.pause();
+	process.stdin.pipe(lstream);
+	lstream.resume();
 
 	// Set up file write streams
 	for (i = 0; i < opts.nReducers; ++i) {

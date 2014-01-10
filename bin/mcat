@@ -99,6 +99,13 @@ function main()
 				    response.statusCode);
 				process.exit(1);
 			}
+
+			/*
+			 * Given that we got a 204, we don't care about the
+			 * response body, but we want to make sure Node reads it
+			 * so that we exit.
+			 */
+			response.resume();
 		});
 	});
 }
