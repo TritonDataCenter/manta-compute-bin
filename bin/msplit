@@ -197,7 +197,6 @@ function main()
 	lstream = new mod_lstream();
 
 	lstream.on('line', function (line) {
-		console.error('line: "%s"', line);
 		var ws = msStreams[opts.reducerSelector(line, opts)];
 		var flushed = ws.write(line);
 		flushed = ws.write('\n') && flushed;

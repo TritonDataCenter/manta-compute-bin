@@ -122,6 +122,7 @@ test('testNoOpts', function (t)
 		opts: []
 	}, function (result) {
 		t.equal(2, result.code);
+		t.equal('', result.stdout);
 		t.done();
 	});
 });
@@ -142,6 +143,8 @@ test('testBasic', function (t)
 			'1': '2\n4\n'
 		}, reqs);
 		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });
@@ -167,6 +170,8 @@ test('testBasicAltField', function (t)
 			'1': '1,2,2\n1,3,4\n'
 		}, reqs);
 		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });
@@ -187,6 +192,8 @@ test('testBasicJson', function (t)
 			'1': '{"x":2}\n{"x":4}\n'
 		}, reqs);
 		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });
@@ -208,6 +215,8 @@ test('testBasicExec', function (t)
 			'1': '3\n4\n'
 		}, reqs);
 		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });
@@ -229,6 +238,8 @@ test('testBasicExecJson', function (t)
 			'1': '{"x":3}\n{"x":4}\n'
 		}, reqs);
 		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });
@@ -250,6 +261,8 @@ test('testExecWithoutReturn', function (t)
 			'1': '3\n4\n'
 		}, reqs);
 		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });
@@ -271,6 +284,8 @@ test('testExecWithTrailingSemicolon', function (t)
 			'1': '3\n4\n'
 		}, reqs);
 		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });
@@ -293,6 +308,8 @@ test('testReducerTargetingWithDashI', function (t)
 			'2': '2\n5\n8\n'
 		}, reqs);
 		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });
@@ -308,6 +325,7 @@ test('testDashIOutOfRange', function (t)
 	}, function (result) {
 		t.equal(1, result.code);
 		t.equal(0, SERVER.requests.length);
+		t.equal('', result.stdout);
 		t.done();
 	});
 });
