@@ -110,7 +110,6 @@ test('testNoOpts', function (t)
 	});
 });
 
-
 test('testBasic', function (t)
 {
 	var path = '/MANTA_USER/stor/mtee.txt';
@@ -126,6 +125,7 @@ test('testBasic', function (t)
 		t.equal(sin, req.body);
 		// Should *not* be reducer output.
 		t.ok(req.headers['x-marlin-stream'] === undefined);
+		t.equal('2', req.headers['x-durability-level']);
 		t.equal(path, req.url);
 		t.done();
 	});
@@ -148,6 +148,40 @@ test('testAddHeaders', function (t)
 		t.ok(req.headers['x-marlin-stream'] === undefined);
 		t.ok('*', req.headers['access-control-origin']);
 		t.equal(path, req.url);
+		t.done();
+	});
+});
+
+test('testDurabilityLevel', function (t)
+{
+	var path = '/MANTA_USER/stor/mtee.txt';
+	var sin = '1\n2\n3\n4\n';
+	runTest({
+		stdin: sin,
+		opts: ['-c', '3', path]
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(sin, result.stdout);
+		t.equal(1, SERVER.requests.length);
+		var req = SERVER.requests[0];
+		t.equal(sin, req.body);
+		// Should *not* be reducer output.
+		t.ok(req.headers['x-marlin-stream'] === undefined);
+		t.equal('3', req.headers['x-durability-level']);
+		t.equal(path, req.url);
+		t.done();
+	});
+});
+
+test('testInvalidDurabilityLevel', function (t)
+{
+	var path = '/MANTA_USER/stor/mtee.txt';
+	var sin = '1\n2\n3\n4\n';
+	runTest({
+		stdin: sin,
+		opts: ['-c', 'foo', path]
+	}, function (result) {
+		t.equal(2, result.code);
 		t.done();
 	});
 });

@@ -9,10 +9,10 @@ var mod_getopt = require('posix-getopt');
 var mod_manta = require('manta');
 
 /*
- * mtee: demux streams to send to multiple reducers
+ * mtee: save an object to manta and print to stdout
  */
 var msUsageMessage = [
-	'usage: mtee [manta_key] [-t output_file]',
+	'usage: mtee [-c durability] [-H header:value ...] [manta_key]',
 	'',
 	'mtee is used to capture stdin and write to both stdout and a manta',
 	'object.  For example, this will capture the output of cmd to manta',
@@ -24,13 +24,21 @@ var msUsageMessage = [
 var mtHeaders = {};
 var mtKey = null;
 var mtTmpFile = '/var/tmp/mtee.' + process.pid;
+var mtCopies = 2;
 
 function main() {
 	var option;
-	var parser = new mod_getopt.BasicParser('H:t:', process.argv);
+	var parser = new mod_getopt.BasicParser('c:H:', process.argv);
 
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
+
+		case 'c':
+			mtCopies = parseInt(option.optarg, 10);
+			if (isNaN(mtCopies)) {
+				usage('invalid durability (-c)');
+			}
+			break;
 
 		case 'H':
 			if (option.optarg.indexOf(': ') === -1) {
@@ -109,7 +117,7 @@ function mtUploadFile()
 		'log': log
 	});
 	var opts = {
-		copies: 1,
+		copies: mtCopies,
 		headers: mtHeaders
 	};
 

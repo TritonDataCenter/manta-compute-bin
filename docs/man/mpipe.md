@@ -9,7 +9,7 @@ mpipe - advanced output pipe for the current task
 SYNOPSIS
 --------
 
-`mpipe` [-p] [-r rIdx] [-H header:value ...] [manta path]
+`mpipe` [-p] [-r rIdx] [-H header: value ...] [manta path]
 
 DESCRIPTION
 -----------

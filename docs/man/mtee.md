@@ -9,7 +9,7 @@ mtee - capture stdin and write to both stdout and a Manta object.
 SYNOPSIS
 --------
 
-`mtee` [manta object]
+`mtee` [-c durability] [-H header: value ...] [manta object]
 
 DESCRIPTION
 -----------
@@ -30,6 +30,18 @@ EXAMPLES
 --------
 
     $ mtee /$MANTA_USER/stor/tee.out
+    $ mtee -H 'Access-Control-Allow-Origin: *' /$MANTA_USER/stor/tee.out
+    $ mtee -c 1 /$MANTA_USER/stor/tee.out
+
+OPTIONS
+-------
+
+`-c [number]`
+  Set the durability level for the object.  Defaults to 2.
+
+`-H '[http-header]: [value]'`
+  Headers to set on the resulting PUT request to Manta.  For example,
+  `Access-Control-Allow-Origin: *`.
 
 BUGS
 ----

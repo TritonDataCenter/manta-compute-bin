@@ -17,7 +17,7 @@ var mod_macommon = require('../lib/common');
  * mpipe: distributed pipe
  */
 var dpUsageMessage = [
-    'usage: mpipe [-p] [-r reducer] [-H header:value ... ] [objectkey]',
+    'usage: mpipe [-p] [-r reducer] [-H header: value ... ] [objectkey]',
     '',
     'mpipe is a distributed pipe for compute jobs.  This command reads data',
     'from stdin and saves it as a new object called "objectkey".  The new ',
