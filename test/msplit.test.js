@@ -319,8 +319,7 @@ test('testDashIOutOfRange', function (t)
 	var sin = '1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n';
 	runTest({
 		stdin: sin,
-		opts: ['-i', '-n', 2, '-e',
-		       '4'],
+		opts: ['-i', '-n', 2, '-e', '4'],
 		nReducers: 2
 	}, function (result) {
 		t.equal(1, result.code);

@@ -447,10 +447,15 @@ function msUploadFiles(opts)
 			'iostream': 'stdout',
 			'rIdx': i
 		}, function (args) {
-			++uploaded;
-			if (uploaded === opts.nReducers) {
-				client.close();
-			}
+			mod_fs.unlink(args.filename, function (err) {
+				if (err) {
+					msFatal(err.message);
+				}
+				++uploaded;
+				if (uploaded === opts.nReducers) {
+					client.close();
+				}
+			});
 		});
 	}
 }

@@ -168,10 +168,16 @@ function dpUploadFile()
 	    'iostream': 'stdout',
 	    'rIdx': dpReducer
 	}, function (err) {
-		if (err)
+		if (err) {
 			dpFatal(err.message);
-		console.log(dpObjkey);
-		client.close();
+		}
+		mod_fs.unlink(dpTmpfile, function (err2) {
+			if (err2) {
+				dpFatal(err.message);
+			}
+			console.log(dpObjkey);
+			client.close();
+		});
 	}, dpNoretry);
 }
 
