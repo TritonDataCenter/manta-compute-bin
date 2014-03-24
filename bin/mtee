@@ -8,6 +8,8 @@ var mod_fs = require('fs');
 var mod_getopt = require('posix-getopt');
 var mod_manta = require('manta');
 
+var mod_macommon = require('../lib/common');
+
 /*
  * mtee: save an object to manta and print to stdout
  */
@@ -36,17 +38,21 @@ function main() {
 		case 'c':
 			mtCopies = parseInt(option.optarg, 10);
 			if (isNaN(mtCopies)) {
-				usage('invalid durability (-c)');
+				usage('mtee: invalid durability (-c)');
 			}
 			break;
 
 		case 'H':
-			if (option.optarg.indexOf(': ') === -1) {
-				usage('headers must be in the format of: ' +
-				      '[header] + ": " + [value]');
+			try {
+				var h = mod_macommon.mantaParseHeaderOpt(
+					option.optarg);
+			} catch (e) {
+				var m = 'mtee: headers must be in the format ' +
+					'of: [header] + ": " + [value]';
+				console.error(m);
+				usage();
 			}
-			var p = option.optarg.split(': ');
-			mtHeaders[p[0]] = p.slice(1).join(': ');
+			mtHeaders[h.key] = h.value;
 			break;
 
 		default:
@@ -62,7 +68,7 @@ function main() {
 	}
 
 	if (!mtKey) {
-		console.error('A manta object key must be specified.');
+		console.error('mtee: A manta object key must be specified.');
 		usage();
 	}
 

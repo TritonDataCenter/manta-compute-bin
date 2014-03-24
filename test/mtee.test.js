@@ -146,8 +146,52 @@ test('testAddHeaders', function (t)
 		t.equal(sin, req.body);
 		// Should *not* be reducer output.
 		t.ok(req.headers['x-marlin-stream'] === undefined);
-		t.ok('*', req.headers['access-control-origin']);
+		t.equal('*', req.headers['access-control-origin']);
 		t.equal(path, req.url);
+		t.done();
+	});
+});
+
+test('testAddManyHeaders', function (t)
+{
+	var path = '/MANTA_USER/stor/mtee.txt';
+	var sin = '1\n2\n3\n4\n';
+	runTest({
+		stdin: sin,
+		opts: [
+			'-H', 'Access-Control-Origin: *',
+			'-H', 'a:b:c',
+			'-H', 'd: e:f',
+			'-H', 'g:h: i',
+			'-H', 'j: k: l',
+			path]
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(sin, result.stdout);
+		t.equal(1, SERVER.requests.length);
+		var req = SERVER.requests[0];
+		t.equal(sin, req.body);
+		// Should *not* be reducer output.
+		t.ok(req.headers['x-marlin-stream'] === undefined);
+		t.equal('*', req.headers['access-control-origin']);
+		t.equal('b:c', req.headers['a']);
+		t.equal('e:f', req.headers['d']);
+		t.equal('h: i', req.headers['g']);
+		t.equal('k: l', req.headers['j']);
+		t.equal(path, req.url);
+		t.done();
+	});
+});
+
+test('testAddInvalidHeaderOption', function (t)
+{
+	var path = '/MANTA_USER/stor/mtee.txt';
+	var sin = '1\n2\n3\n4\n';
+	runTest({
+		stdin: sin,
+		opts: ['-H', 'foo', path]
+	}, function (result) {
+		t.equal(2, result.code);
 		t.done();
 	});
 });

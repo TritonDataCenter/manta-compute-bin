@@ -17,7 +17,7 @@ var mod_macommon = require('../lib/common');
  * mpipe: distributed pipe
  */
 var dpUsageMessage = [
-    'usage: mpipe [-p] [-r reducer] [-H header: value ... ] [objectkey]',
+    'usage: mpipe [-p] [-r reducer] [-H header:value ... ] [objectkey]',
     '',
     'mpipe is a distributed pipe for compute jobs.  This command reads data',
     'from stdin and saves it as a new object called "objectkey".  The new ',
@@ -77,14 +77,16 @@ function main()
 			dpSkipStdin = true;
 			break;
 		case 'H':
-			if (option.optarg.indexOf(': ') === -1) {
+			try {
+				var h = mod_macommon.mantaParseHeaderOpt(
+					option.optarg);
+			} catch (e) {
 				m = 'mpipe: headers must be in the ' +
 					'format [header]: [value].';
 				console.error(m);
 				usage();
 			}
-			var p = option.optarg.split(': ');
-			dpHeaders[p[0]] = p.slice(1).join(': ');
+			dpHeaders[h.key] = h.value;
 			break;
 
 		case 'p':
