@@ -202,6 +202,15 @@ test('testFileUpload', function (t)
 		var req = SERVER.requests[0];
 		t.equal(data, req.body);
 		t.ok('stdout', req.headers['x-manta-stream']);
+		try {
+			mod_fs.statSync(fileName);
+		} catch (e) {
+			console.log({
+				'err': e
+			}, 'error checking that file exists');
+			t.fail();
+		}
+		mod_fs.unlinkSync(fileName);
 		t.done();
 	});
 });
@@ -223,6 +232,7 @@ test('testFileUploadTargetingReducer', function (t)
 		t.equal(data, req.body);
 		t.ok('stdout', req.headers['x-manta-stream']);
 		t.equal('1', req.headers['x-manta-reducer']);
+		mod_fs.unlinkSync(fileName);
 		t.done();
 	});
 });

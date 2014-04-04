@@ -17,7 +17,8 @@ var mod_macommon = require('../lib/common');
  * mpipe: distributed pipe
  */
 var dpUsageMessage = [
-    'usage: mpipe [-p] [-r reducer] [-H header:value ... ] [objectkey]',
+    'usage: mpipe [-f file] [-p] [-r reducer] [-H header:value ... ] ',
+    '             [objectkey]',
     '',
     'mpipe is a distributed pipe for compute jobs.  This command reads data',
     'from stdin and saves it as a new object called "objectkey".  The new ',
@@ -48,7 +49,7 @@ var dpObjkey, dpReducer;
 var dpOptP = false;
 var dpOutstream, dpInstream;
 var dpNoretry = false;
-var dpSkipStdin = false;
+var dpUsingExistingFile = false;
 var dpTmpfile = '/var/tmp/mpipe.' + process.pid;
 
 function main()
@@ -74,7 +75,7 @@ function main()
 				console.error(m);
 				usage();
 			}
-			dpSkipStdin = true;
+			dpUsingExistingFile = true;
 			break;
 		case 'H':
 			try {
@@ -128,7 +129,7 @@ function main()
 		process.exit(2);
 	}
 
-	if (dpSkipStdin) {
+	if (dpUsingExistingFile) {
 		dpUploadFile();
 	} else {
 		console.error('saving stdin to %s', dpTmpfile);
@@ -173,13 +174,18 @@ function dpUploadFile()
 		if (err) {
 			dpFatal(err.message);
 		}
-		mod_fs.unlink(dpTmpfile, function (err2) {
+		function end(err2) {
 			if (err2) {
 				dpFatal(err2.message);
 			}
 			console.log(dpObjkey);
 			client.close();
-		});
+		}
+		if (!dpUsingExistingFile) {
+			mod_fs.unlink(dpTmpfile, end);
+		} else {
+			end();
+		}
 	}, dpNoretry);
 }
 
