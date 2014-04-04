@@ -175,7 +175,7 @@ function dpUploadFile()
 		}
 		mod_fs.unlink(dpTmpfile, function (err2) {
 			if (err2) {
-				dpFatal(err.message);
+				dpFatal(err2.message);
 			}
 			console.log(dpObjkey);
 			client.close();
