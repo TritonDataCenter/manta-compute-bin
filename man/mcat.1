@@ -12,13 +12,16 @@ but without actually fetching the data.  For example:
 .PP
 .RS
 .nf
-mcat /$MANTA_USER/stor/scores.csv
+mcat ~~/stor/scores.csv
 .fi
 .RE
 .PP
-emits the object \fB\fC/$MANTA_USER/stor/scores.csv\fR as an input to the next phase
+emits the object \fB\fC~~/stor/scores.csv\fR as an input to the next phase
 (or as a final job output), but \fIwithout\fP actually downloading it as part of the
 current phase.
+.PP
+The shortcut \fB\fC~~\fR is equivalent to \fB\fC/:login\fR
+where \fB\fC:login\fR is the account login name.
 .PP
 As with mpipe, when you use mcat, the task's stdout will not be captured and
 saved as it is by default.
@@ -30,7 +33,7 @@ instead of this:
 .PP
 .RS
 .nf
- $ mfind /$MANTA_USER/public | mjob create -m wc
+ $ mfind ~~/public | mjob create \-m wc
 .fi
 .RE
 .PP
@@ -39,8 +42,8 @@ this once:
 .PP
 .RS
 .nf
-$ mfind /$MANTA_USER/public > /var/tmp/inputs
-$ mput -f /var/tmp/inputs /$MANTA_USER/public/inputs
+$ mfind ~~/public > /var/tmp/inputs
+$ mput \-f /var/tmp/inputs ~~/public/inputs
 .fi
 .RE
 .PP
@@ -48,33 +51,32 @@ And then for subsequent jobs, just do this:
 .PP
 .RS
 .nf
-$ echo /$MANTA_USER/public/inputs | mjob create -m "xargs mcat" -m wc)
+$ echo ~~/public/inputs | mjob create \-m "xargs mcat" \-m wc)
 .fi
 .RE
 .PP
 This is much quicker to kick off, since you're just uploading one object name.
-The first phase invokes "mcat" on lines from /$MANTA_USER/public/inputs.  Each
+The first phase invokes "mcat" on lines from ~~/public/inputs.  Each
 of these lines is treated as a Manta path, and the corresponding object becomes
 an input to the second phase.
 .PP
 The object path is not resolved until it's processed for the next phase.  So if
 you specify an object that does not exist, this will produce a
-ResourceNotFoundError for the phase \fIafter\fP the \fB\fCmcat\fR.  Similarly, if you
+ResourceNotFoundError for the phase \fIafter\fP the \fB\fCmcat\fR\&.  Similarly, if you
 specify an object that you don't have access to, you'll get an error in the next
 phase when you try to use it.
 .SH EXAMPLES
 .PP
 .RS
 .nf
-$ mcat /$MANTA_USER/stor/scores.csv
+$ mcat ~~/stor/scores.csv
 .fi
 .RE
 .SH OPTIONS
 .TP
-\fB\fC-r\fR
+\fB\fC\-r\fR
 Specify the reducer the Manta object should be directed to.
 .SH BUGS
 .PP
 Report bugs at Github
-.UR https://github.com/joyent/manta-compute-bin/issues
-.UE
+\[la]https://github.com/joyent/manta-compute-bin/issues\[ra]

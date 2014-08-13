@@ -17,7 +17,8 @@
 #
 # Tools
 #
-MD2MAN                  := md2man
+# Get md2man-roff from <https://github.com/sunaku/md2man>
+MD2MAN                  := md2man-roff
 NODEUNIT		:= ./node_modules/.bin/nodeunit
 NPM			:= npm
 

@@ -16,32 +16,34 @@ input on stdout as well, much like
 prevent stdout from being captured.
 .PP
 For example, this will capture the output of cmd to manta object
-\fB\fC/$MANTA_USER/stor/tee.out\fR and still pipe what was coming from cmd to cmd2:
+\fB\fC~~/stor/tee.out\fR and still pipe what was coming from cmd to cmd2:
 .PP
 .RS
 .nf
-$ cmd | mtee /$MANTA_USER/stor/tee.out | cmd2
+$ cmd | mtee ~~/stor/tee.out | cmd2
 .fi
 .RE
+.PP
+The shortcut \fB\fC~~\fR is equivalent to \fB\fC/:login\fR
+where \fB\fC:login\fR is the account login name.
 .SH EXAMPLES
 .PP
 .RS
 .nf
-$ mtee /$MANTA_USER/stor/tee.out
-$ mtee -H 'Access-Control-Allow-Origin: *' /$MANTA_USER/stor/tee.out
-$ mtee -c 1 /$MANTA_USER/stor/tee.out
+$ mtee ~~/stor/tee.out
+$ mtee \-H 'Access\-Control\-Allow\-Origin: *' ~~/stor/tee.out
+$ mtee \-c 1 ~~/stor/tee.out
 .fi
 .RE
 .SH OPTIONS
 .TP
-\fB\fC-c [number]\fR
+\fB\fC\-c [number]\fR
 Set the durability level for the object.  Defaults to 2.
 .TP
-\fB\fC-H '[http-header]: [value]'\fR
+\fB\fC\-H '[http\-header]: [value]'\fR
 Headers to set on the resulting PUT request to Manta.  For example,
-\fB\fCAccess-Control-Allow-Origin: *\fR.
+\fB\fCAccess\-Control\-Allow\-Origin: *\fR\&.
 .SH BUGS
 .PP
 Report bugs at Github
-.UR https://github.com/joyent/manta-compute-bin/issues
-.UE
+\[la]https://github.com/joyent/manta-compute-bin/issues\[ra]
