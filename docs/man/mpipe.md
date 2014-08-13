@@ -38,7 +38,11 @@ you use mpipe for several reasons:
   with no arguments are automatically given unique names.  You can control the
   name yourself by specifying an argument to mpipe:
 
-    $ wc | mpipe /$MANTA_USER/stor/count
+    $ wc | mpipe ~~/stor/count
+
+The shortcut `~~` is equivalent to `/:login`
+where `:login` is the account login name.
+
 
 A job that creates thumbnails from images might use `MANTA_INPUT_OBJECT` to
 infer the desired path for the thumbnail (e.g.,
@@ -57,7 +61,7 @@ infer the desired path for the thumbnail (e.g.,
 EXAMPLES
 --------
 
-    $ wc | mpipe -H 'Access-Control-Allow-Origin: *' /$MANTA_USER/public/wc.txt
+    $ wc | mpipe -H 'Access-Control-Allow-Origin: *' ~~/public/wc.txt
     $ .. | mpipe -r 2
 
 OPTIONS

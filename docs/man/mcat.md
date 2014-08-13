@@ -17,11 +17,14 @@ DESCRIPTION
 `mcat` emits the contents of a Manta object as an output of the current task,
 but without actually fetching the data.  For example:
 
-    mcat /$MANTA_USER/stor/scores.csv
+    mcat ~~/stor/scores.csv
 
-emits the object `/$MANTA_USER/stor/scores.csv` as an input to the next phase
+emits the object `~~/stor/scores.csv` as an input to the next phase
 (or as a final job output), but *without* actually downloading it as part of the
 current phase.
+
+The shortcut `~~` is equivalent to `/:login`
+where `:login` is the account login name.
 
 As with mpipe, when you use mcat, the task's stdout will not be captured and
 saved as it is by default.
@@ -31,20 +34,20 @@ of input objects.  You can store the set of objects in a separate "manifest"
 object and have the first phase of your job process that with "mcat".  So
 instead of this:
 
-     $ mfind /$MANTA_USER/public | mjob create -m wc
+     $ mfind ~~/public | mjob create -m wc
 
 which may take a long time if `mfind` returns a lot of objects, you could do
 this once:
 
-    $ mfind /$MANTA_USER/public > /var/tmp/inputs
-    $ mput -f /var/tmp/inputs /$MANTA_USER/public/inputs
+    $ mfind ~~/public > /var/tmp/inputs
+    $ mput -f /var/tmp/inputs ~~/public/inputs
 
 And then for subsequent jobs, just do this:
 
-    $ echo /$MANTA_USER/public/inputs | mjob create -m "xargs mcat" -m wc)
+    $ echo ~~/public/inputs | mjob create -m "xargs mcat" -m wc)
 
 This is much quicker to kick off, since you're just uploading one object name.
-The first phase invokes "mcat" on lines from /$MANTA_USER/public/inputs.  Each
+The first phase invokes "mcat" on lines from ~~/public/inputs.  Each
 of these lines is treated as a Manta path, and the corresponding object becomes
 an input to the second phase.
 
@@ -57,7 +60,7 @@ phase when you try to use it.
 EXAMPLES
 --------
 
-    $ mcat /$MANTA_USER/stor/scores.csv
+    $ mcat ~~/stor/scores.csv
 
 OPTIONS
 -------

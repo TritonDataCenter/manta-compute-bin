@@ -22,16 +22,20 @@ input on stdout as well, much like tee(1).
 prevent stdout from being captured.
 
 For example, this will capture the output of cmd to manta object
-`/$MANTA_USER/stor/tee.out` and still pipe what was coming from cmd to cmd2:
+`~~/stor/tee.out` and still pipe what was coming from cmd to cmd2:
 
-    $ cmd | mtee /$MANTA_USER/stor/tee.out | cmd2
+    $ cmd | mtee ~~/stor/tee.out | cmd2
+
+The shortcut `~~` is equivalent to `/:login`
+where `:login` is the account login name.
+
 
 EXAMPLES
 --------
 
-    $ mtee /$MANTA_USER/stor/tee.out
-    $ mtee -H 'Access-Control-Allow-Origin: *' /$MANTA_USER/stor/tee.out
-    $ mtee -c 1 /$MANTA_USER/stor/tee.out
+    $ mtee ~~/stor/tee.out
+    $ mtee -H 'Access-Control-Allow-Origin: *' ~~/stor/tee.out
+    $ mtee -c 1 ~~/stor/tee.out
 
 OPTIONS
 -------
