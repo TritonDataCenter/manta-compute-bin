@@ -11,6 +11,7 @@ var mod_getopt = require('posix-getopt');
 var mod_lib = require('../lib');
 var mod_manta = require('manta');
 var mod_uuid = require('node-uuid');
+var mod_vasync = require('vasync');
 
 /*
  * msplit: demux streams to send to multiple reducers
@@ -83,6 +84,16 @@ var msHashAlgo = 'md5';
 var msObjPrefix = null;
 var msStreams = [];
 var msTmpFilePrefix = '/var/tmp/msplit.' + process.pid + '.';
+
+/*
+ * The number of concurrent upstream connections should be less than the maximum
+ * number that Manta allows from a single task before queueing them.  This is
+ * part of Marlin's configuration, but it's not exposed to user tasks, so we
+ * hardcode the default number here.  A better approach would be to have the
+ * server issue a 429 "Too Many Requests" response (instead of queueing them)
+ * and have the client back off when this happens.
+ */
+var msConcurrency = 25;
 
 function main()
 {
@@ -436,7 +447,9 @@ function msUploadFiles(opts)
 	});
 
 	var uploaded = 0;
-	for (var i = 0; i < opts.nReducers; ++i) {
+	var queue = mod_vasync.queuev({
+	    'concurrency': msConcurrency,
+	    'worker': function (i, queuecallback) {
 		var filename = msTmpFilePrefix + i;
 		var objname = msObjPrefix + i;
 		msUploadFile({
@@ -455,8 +468,15 @@ function msUploadFiles(opts)
 				if (uploaded === opts.nReducers) {
 					client.close();
 				}
+
+				queuecallback();
 			});
 		});
+	    }
+	});
+
+	for (var j = 0; j < opts.nReducers; ++j) {
+		queue.push(j);
 	}
 }
 
