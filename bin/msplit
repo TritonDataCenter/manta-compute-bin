@@ -1,6 +1,24 @@
 #!/usr/bin/env node
 // -*- mode: js -*-
-// Copyright (c) 2013, Joyent, Inc. All rights reserved.
+// Copyright (c) 2016, Joyent, Inc. All rights reserved.
+
+/*
+ * The number of concurrent upstream connections should be less than the maximum
+ * number that Manta allows from a single task before queueing them.  This is
+ * part of Marlin's configuration, but it's not exposed to user tasks, so we
+ * hardcode the default number here.  A better approach would be to have the
+ * server issue a 429 "Too Many Requests" response (instead of queueing them)
+ * and have the client back off when this happens.
+ */
+var msConcurrency = 25;
+
+/*
+ * Configure maxSockets based on our desired concurrency.  We have to do this
+ * here, before pulling in "restify-clients" (via "manta"), because
+ * "restify-clients" reads these from the top-level.
+ */
+var mod_http = require('http');
+mod_http.globalAgent.maxSockets = msConcurrency;
 
 var mod_assert = require('assert');
 var mod_bunyan = require('bunyan');
@@ -84,16 +102,6 @@ var msHashAlgo = 'md5';
 var msObjPrefix = null;
 var msStreams = [];
 var msTmpFilePrefix = '/var/tmp/msplit.' + process.pid + '.';
-
-/*
- * The number of concurrent upstream connections should be less than the maximum
- * number that Manta allows from a single task before queueing them.  This is
- * part of Marlin's configuration, but it's not exposed to user tasks, so we
- * hardcode the default number here.  A better approach would be to have the
- * server issue a 429 "Too Many Requests" response (instead of queueing them)
- * and have the client back off when this happens.
- */
-var msConcurrency = 25;
 
 function main()
 {
