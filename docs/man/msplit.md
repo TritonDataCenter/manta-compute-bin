@@ -1,4 +1,4 @@
-msplit 1 "May 2013" Manta "Manta Compute Bin"
+msplit 1 "Jan 2019" Manta "Manta Compute Bin"
 ============================================
 
 NAME
@@ -10,7 +10,7 @@ SYNOPSIS
 --------
 
 `msplit` [-d delimiter] [-e javascript] [-f field_list] [-j] [-i]
-         [-n number_of_reducers]
+         [-n number_of_reducers] [-z]
 
 
 DESCRIPTION
@@ -99,6 +99,7 @@ EXAMPLES
 
     $ msplit -d ',' -f 5,3 -n 4
     $ msplit -j -f id,type -n 4
+    $ msplit -j -f group_uuid,type -n 3 -z
     $ msplit -e "return line.substring(0,16)" -n 4
     $ msplit -j -e "this.id.substring(0,9)" -n 4
     $ msplit -i -j -e "this.latency % 4" -n 4
@@ -129,6 +130,12 @@ OPTIONS
 
 `-n`
   Number of reducers.  Should match the number of reducers for your job.
+
+`-z`
+  Compress the ouput in gzip format. When the intermediate objects are compressible,
+  using this option reduces the time it takes to upload the task outputs to manta.
+  Note, concatenating gzip streams should not be an issue as long as the next phase
+  treats its input as a single stream of compressed data.
 
 BUGS
 ----

@@ -4,6 +4,7 @@
 
 var mod_child_process = require('child_process');
 var mod_fs = require('fs');
+var mod_path = require('path');
 var mod_http = require('http');
 
 var mod_bunyan = require('bunyan');
@@ -79,12 +80,12 @@ function runTest(opts, callback)
 
 before(function (cb) {
 	SERVER = mod_http.createServer(function (req, res) {
-		var body = '';
+		var body = [];
 		req.on('data', function (data) {
-			body += data;
+			body.push(data);
 		});
 		req.on('end', function () {
-			req.body = body;
+			req.body = Buffer.concat(body);
 			SERVER.requests.push(req);
 			res.writeHead(204);
 			res.end();
@@ -139,8 +140,8 @@ test('testBasic', function (t)
 		t.equal(2, SERVER.requests.length);
 		var reqs = transformRequests(t, SERVER.requests);
 		t.deepEqual({
-			'0': '1\n3\n',
-			'1': '2\n4\n'
+			'0': new Buffer('1\n3\n'),
+			'1': new Buffer('2\n4\n')
 		}, reqs);
 		t.ok(result.error === null);
 		t.equal('', result.stdout);
@@ -166,8 +167,8 @@ test('testBasicAltField', function (t)
 		t.equal(2, SERVER.requests.length);
 		var reqs = transformRequests(t, SERVER.requests);
 		t.deepEqual({
-			'0': '1,2,3\n1,1,1\n',
-			'1': '1,2,2\n1,3,4\n'
+			'0': new Buffer('1,2,3\n1,1,1\n'),
+			'1': new Buffer('1,2,2\n1,3,4\n')
 		}, reqs);
 		t.ok(result.error === null);
 		t.equal('', result.stdout);
@@ -188,8 +189,8 @@ test('testBasicJson', function (t)
 		t.equal(2, SERVER.requests.length);
 		var reqs = transformRequests(t, SERVER.requests);
 		t.deepEqual({
-			'0': '{"x":1}\n{"x":3}\n',
-			'1': '{"x":2}\n{"x":4}\n'
+			'0': new Buffer('{"x":1}\n{"x":3}\n'),
+			'1': new Buffer('{"x":2}\n{"x":4}\n')
 		}, reqs);
 		t.ok(result.error === null);
 		t.equal('', result.stdout);
@@ -211,8 +212,8 @@ test('testBasicExec', function (t)
 		t.equal(2, SERVER.requests.length);
 		var reqs = transformRequests(t, SERVER.requests);
 		t.deepEqual({
-			'0': '1\n2\n',
-			'1': '3\n4\n'
+			'0': new Buffer('1\n2\n'),
+			'1': new Buffer('3\n4\n')
 		}, reqs);
 		t.ok(result.error === null);
 		t.equal('', result.stdout);
@@ -234,8 +235,8 @@ test('testBasicExecJson', function (t)
 		t.equal(2, SERVER.requests.length);
 		var reqs = transformRequests(t, SERVER.requests);
 		t.deepEqual({
-			'0': '{"x":1}\n{"x":2}\n',
-			'1': '{"x":3}\n{"x":4}\n'
+			'0': new Buffer('{"x":1}\n{"x":2}\n'),
+			'1': new Buffer('{"x":3}\n{"x":4}\n')
 		}, reqs);
 		t.ok(result.error === null);
 		t.equal('', result.stdout);
@@ -257,8 +258,8 @@ test('testExecWithoutReturn', function (t)
 		t.equal(2, SERVER.requests.length);
 		var reqs = transformRequests(t, SERVER.requests);
 		t.deepEqual({
-			'0': '1\n2\n',
-			'1': '3\n4\n'
+			'0': new Buffer('1\n2\n'),
+			'1': new Buffer('3\n4\n')
 		}, reqs);
 		t.ok(result.error === null);
 		t.equal('', result.stdout);
@@ -280,8 +281,8 @@ test('testExecWithTrailingSemicolon', function (t)
 		t.equal(2, SERVER.requests.length);
 		var reqs = transformRequests(t, SERVER.requests);
 		t.deepEqual({
-			'0': '1\n2\n',
-			'1': '3\n4\n'
+			'0': new Buffer('1\n2\n'),
+			'1': new Buffer('3\n4\n')
 		}, reqs);
 		t.ok(result.error === null);
 		t.equal('', result.stdout);
@@ -303,9 +304,9 @@ test('testReducerTargetingWithDashI', function (t)
 		t.equal(3, SERVER.requests.length);
 		var reqs = transformRequests(t, SERVER.requests);
 		t.deepEqual({
-			'0': '3\n6\n9\n',
-			'1': '1\n4\n7\n10\n',
-			'2': '2\n5\n8\n'
+			'0': new Buffer('3\n6\n9\n'),
+			'1': new Buffer('1\n4\n7\n10\n'),
+			'2': new Buffer('2\n5\n8\n')
 		}, reqs);
 		t.ok(result.error === null);
 		t.equal('', result.stdout);
@@ -325,6 +326,35 @@ test('testDashIOutOfRange', function (t)
 		t.equal(1, result.code);
 		t.equal(0, SERVER.requests.length);
 		t.equal('', result.stdout);
+		t.done();
+	});
+});
+
+test('testBasicGzCompress', function (t)
+{
+	var testDataDir = mod_path.dirname(__filename) + '/data';
+	var obj0Path = testDataDir + '/testBasicGzCompress_output_00';
+	var obj1Path = testDataDir + '/testBasicGzCompress_output_01';
+
+	var obj0 = mod_fs.readFileSync(obj0Path);
+	var obj1 = mod_fs.readFileSync(obj1Path);
+
+	var sin = '1\n2\n3\n4\n';
+	runTest({
+		stdin: sin,
+		opts: ['-n', 2, '-z'],
+		nReducers: 2
+	}, function (result) {
+		t.equal(0, result.code);
+		t.equal(2, SERVER.requests.length);
+		var reqs = transformRequests(t, SERVER.requests);
+		t.deepEqual({
+			'0': obj0,
+			'1': obj1
+		}, reqs);
+		t.ok(result.error === null);
+		t.equal('', result.stdout);
+		t.equal('', result.stderr);
 		t.done();
 	});
 });

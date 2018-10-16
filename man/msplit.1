@@ -1,11 +1,11 @@
-.TH msplit 1 "May 2013" Manta "Manta Compute Bin"
+.TH msplit 1 "Jan 2019" Manta "Manta Compute Bin"
 .SH NAME
 .PP
 msplit \- split the output stream for the current task to many reducers.
 .SH SYNOPSIS
 .PP
-\fB\fCmsplit\fR [\-d delimiter] [\-e javascript] [\-f field\fIlist] [\-j] [\-i]
-         [\-n number\fPof_reducers]
+\fB\fCmsplit\fR [\-d delimiter] [\-e javascript] [\-f field_list] [\-j] [\-i]
+         [\-n number\fIof\fPreducers] [\-z]
 .SH DESCRIPTION
 .PP
 Reads content from stdin and partitions data across the number of reducers that
@@ -123,6 +123,7 @@ $ ... | msplit -j -e "this.id.substring(0,9)" -n 4
 .nf
 $ msplit -d ',' -f 5,3 -n 4
 $ msplit -j -f id,type -n 4
+$ msplit -j -f group_uuid,type -n 3 -z
 $ msplit -e "return line.substring(0,16)" -n 4
 $ msplit -j -e "this.id.substring(0,9)" -n 4
 $ msplit -i -j -e "this.latency % 4" -n 4
@@ -153,6 +154,12 @@ Process the input as newline\-separated json objects.
 .TP
 \fB\fC-n\fR
 Number of reducers.  Should match the number of reducers for your job.
+.TP
+\fB\fC-z\fR
+Compress the ouput in gzip format. When the intermediate objects are compressible,
+using this option reduces the time it takes to upload the task outputs to manta.
+Note, concatenating gzip streams should not be an issue as long as the next phase
+treats its input as a single stream of compressed data.
 .SH BUGS
 .PP
 Report bugs at Github

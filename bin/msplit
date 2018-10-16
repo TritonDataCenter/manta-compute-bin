@@ -30,13 +30,14 @@ var mod_lib = require('../lib');
 var mod_manta = require('manta');
 var mod_uuid = require('node-uuid');
 var mod_vasync = require('vasync');
+var mod_zlib = require('zlib');
 
 /*
  * msplit: demux streams to send to multiple reducers
  */
 var msUsageMessage = [
 	'usage: msplit [-n number_of_reducers] [-d delimiter] [-f field_list]',
-	'              [-i] [-j] [-e javascript]',
+	'              [-i] [-j] [-e javascript] [-z]',
 	'',
 	'msplit is used to split a stream into many mpipes, one per the number',
 	'of reducers for your job.  The -n option specifies the number of',
@@ -95,7 +96,13 @@ var msUsageMessage = [
 	'Using the (-i) option:',
 	'The -i option turns off partition key hashing and instead treats ',
 	'the kay as the integer index of the reducer.  If you use this option ',
-	'the integer must be between 0 and number_of_reducers - 1.'
+	'the integer must be between 0 and number_of_reducers - 1.',
+	'',
+	'When -z is specified, msplit will compress the output streams in gzip',
+	'format. The next phase in the job needs to expect this and decompress',
+	'its input objects as needed. Note, concatenating gzip streams should ',
+	'not be an issue as long as the next phase treats its input as a ',
+	'stream of compressed data.'
 ].join('\n');
 
 var msHashAlgo = 'md5';
@@ -116,9 +123,10 @@ function main()
 	opts.nReducers = null;
 	opts.parseJson = false;
 	opts.reducerSelector = selectReducerByHash;
+	opts.gzCompress = false;
 	opts.allowedTypes = [ 'string' ];
 
-	parser = new mod_getopt.BasicParser('d:f:n:e:ijt', process.argv);
+	parser = new mod_getopt.BasicParser('d:f:n:e:ijtz', process.argv);
 
 	while ((option = parser.getopt()) !== undefined) {
 		switch (option.option) {
@@ -154,6 +162,9 @@ function main()
 			if (isNaN(opts.nReducers)) {
 				usage('invalid number of reducers');
 			}
+			break;
+		case 'z':
+			opts.gzCompress = true;
 			break;
 
 		default:
@@ -197,21 +208,7 @@ function main()
 
 	// Streams
 	var waitingForDrain = [];
-	var ended = false;
-
-	function tryEnd() {
-		if (ended) {
-			return;
-		}
-		var endNow = !process.stdin.readable;
-		for (var j = 0; j < msStreams.length; ++j) {
-			endNow = endNow && !msStreams[j].writable;
-		}
-		if (endNow) {
-			ended = true;
-			msUploadFiles(opts);
-		}
-	}
+	var nClosedStreams = 0;
 
 	lstream = new mod_lstream();
 
@@ -219,6 +216,10 @@ function main()
 		var ws = msStreams[opts.reducerSelector(line, opts)];
 		var flushed = ws.write(line);
 		flushed = ws.write('\n') && flushed;
+		// If not flushed, add the stream to waitForDrain list
+		// and pause stdin. This is not optimal because it could
+		// become ready again by the time we write to it next time.
+		// TODO: Fix this.
 		if (!flushed) {
 			if (waitingForDrain.indexOf(ws) === -1) {
 				waitingForDrain.push(ws);
@@ -232,53 +233,82 @@ function main()
 	});
 
 	lstream.once('end', function () {
+		// When done processing input, close all the reducer streams.
+		// This will end StringBuffer stream and all the underlying
+		// streams. Ultimately, this will trigger 'close' event on
+		// file stream when all the data have been flushed to disk.
 		for (i = 0; i < opts.nReducers; ++i) {
 			msStreams[i].end();
 		}
-		tryEnd();
 	});
 
 	process.stdin.pause();
 	process.stdin.pipe(lstream);
 	lstream.resume();
 
+	var onStreamError = function (err) {
+		msFatal('File: ' + this.filename + ': ' + err.message);
+	};
+
 	// Set up file write streams
 	for (i = 0; i < opts.nReducers; ++i) {
 		var filename = msTmpFilePrefix + i;
+		var fileStream = mod_fs.createWriteStream(filename);
+		var outputStream = fileStream;
+
+		// Compress the output if '-z' is specified.
+		if (opts.gzCompress) {
+			// When gzip compression is specified, redirect
+			// output to gzip stream and pipe it to the reducer
+			// file.
+			outputStream = mod_zlib.createGzip();
+			outputStream.pipe(fileStream);
+		}
+
 		var stream = mod_lib.createStringWriteBuffer({
-			stream: mod_fs.createWriteStream(filename)
+			stream: outputStream	// Write output to outputStream
 		});
 		stream.filename = filename;
 
-		stream.once('open', function (index) {
+		fileStream.once('open', function (index) {
 			msStreams[index] = this;
+			// Resume stdin when all the reducer files are open.
 			if (Object.keys(msStreams).length === opts.nReducers) {
 				process.stdin.resume();
 			}
 		}.bind(stream, i));
 
 		stream.on('drain', function () {
+			// Remove the stream object from waitingForDrain []
 			var index = waitingForDrain.indexOf(this);
 			if (index !== -1) {
 				waitingForDrain.splice(index, 1);
 			}
+			// Resume stdin when all the reducer streams are ready
+			// to take input.
 			if (waitingForDrain.length === 0) {
 				process.stdin.resume();
 			}
 		}.bind(stream));
 
-		stream.once('error', function (err) {
-			msFatal('File: ' + this.filename + ': ' +
-				err.message);
-		}.bind(stream));
+		// Capture errors on both outputStream and fileStream.
+		// When gzip compression is specified, outputStream is
+		// different from fileStream. Otherwise, outputStream is
+		// fileStream. We register the error event handlers for both
+		// streams in case they are different.
+		outputStream.once('error', onStreamError.bind(stream));
+		fileStream.once('error', onStreamError.bind(stream));
 
-		stream.once('close', function () {
+		fileStream.once('close', function () {
 			if (process.stdin.readable) {
 				msFatal('File: ' + this.filename + ': ' +
 					'write stream closed prematurely');
 				return;
 			}
-			tryEnd();
+			// Upload the files when all the reducer streams
+			// have been closed.
+			if (++nClosedStreams == opts.nReducers)
+				msUploadFiles(opts);
 		}.bind(stream));
 	}
 }
