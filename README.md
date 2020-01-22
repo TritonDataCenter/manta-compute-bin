@@ -6,6 +6,16 @@ of utilities that are on the `$PATH` in a Manta compute job.
 If you aren't familiar with Manta, please see [the Manta landing
 page](http://joyent.com/products/manta).
 
+
+## Active Branches
+
+This repository is part of mantav1, the long term support maintenance version
+of Manta. Development is done on the **[`mantav1`](../../tree/mantav1/)
+branch**, the `master` branch is no longer used. See the [mantav2 overview
+document](https://github.com/joyent/manta/blob/master/docs/mantav2.md) for
+details on major Manta versions.
+
+
 ## Introduction
 
 Each of these utilities aids in proceesing and moving data around within a Manta
