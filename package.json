@@ -11,7 +11,7 @@
         "lstream": "0.0.4",
         "manta": "^5.0.0",
         "memorystream": "0.2.0",
-        "node-uuid": "1.4.0",
+        "node-uuid": "1.4.8",
         "posix-getopt": "1.0.0",
         "printf": "0.1.2",
         "retry": "0.6.0",
