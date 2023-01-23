@@ -1,10 +1,10 @@
 ## Manta Compute Bin
 
-[manta-compute-bin](http://joyent.github.com/manta-compute-bin) is a collection
-of utilities that are on the `$PATH` in a Manta compute job.
+[manta-compute-bin](https://github.com/TritonDataCenter/manta-compute-bin) is a
+collection of utilities that are on the `$PATH` in a Manta compute job.
 
 If you aren't familiar with Manta, please see [the Manta landing
-page](http://joyent.com/products/manta).
+page](https://tritondatacenter.com/products/manta).
 
 
 ## Active Branches
@@ -12,8 +12,8 @@ page](http://joyent.com/products/manta).
 This repository is part of mantav1, the long term support maintenance version
 of Manta. Development is done on the **[`mantav1`](../../tree/mantav1/)
 branch**, the `master` branch is no longer used. See the [mantav2 overview
-document](https://github.com/joyent/manta/blob/master/docs/mantav2.md) for
-details on major Manta versions.
+document](https://github.com/TritonDataCenter/manta/blob/master/docs/mantav2.md)
+for details on major Manta versions.
 
 
 ## Introduction
@@ -63,6 +63,7 @@ your changes in Manta Compute with something like:
 
 The MIT License (MIT)
 Copyright (c) 2012 Joyent
+Copyright 2023 MNX Cloud, Inc.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -84,4 +85,4 @@ SOFTWARE.
 
 ## Bugs
 
-See <https://github.com/joyent/manta-compute-bin/issues>.
+See <https://github.com/TritonDataCenter/manta-compute-bin/issues>.

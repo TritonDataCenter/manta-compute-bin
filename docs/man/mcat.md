@@ -71,4 +71,4 @@ OPTIONS
 BUGS
 ----
 
-Report bugs at [Github](https://github.com/joyent/manta-compute-bin/issues)
+Report bugs at [Github](https://github.com/TritonDataCenter/manta-compute-bin/issues)
